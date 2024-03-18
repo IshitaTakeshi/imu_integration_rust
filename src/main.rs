@@ -44,7 +44,7 @@ fn wedge_so3(v: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
 fn wedge_se23(xi: &Vector9<f64>) -> SMatrix::<f64, 5, 5> {
     let phi = xi.fixed_view::<3, 1>(0, 0).into();
     let nu = xi.fixed_view::<3, 1>(3, 0);
-    let rho = xi.fixed_view::<3, 1>(3, 0);
+    let rho = xi.fixed_view::<3, 1>(6, 0);
 
     let wedge_phi = wedge_so3(&phi);
 
@@ -60,12 +60,15 @@ fn left_jacobian(rotvec: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
     let norm = rotvec.norm();
 
     let identity3 = identity::<3>();
+    let wedge = wedge_so3(&rotvec);
+
     if norm < epsilon {
-        return identity3 + 0.5 * wedge_so3(&rotvec);
+        return identity3 + 0.5 * wedge;
     }
 
-    let wedge = wedge_so3(&(rotvec / norm));
-    identity3 + (f64::sin(norm) / norm) * wedge + (1. - f64::sin(norm) / norm) * wedge * wedge
+    identity3
+        + ((1. - f64::cos(norm)) / (norm * norm)) * wedge
+        + ((norm - f64::sin(norm)) / (norm * norm * norm)) * wedge * wedge
 }
 
 fn exp_so3(rotvec: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
@@ -122,7 +125,6 @@ mod tests {
         let gamma = gamma(3.0);
         assert_eq!(gamma[(2, 3)], 9.8 * 3.0);
         assert_eq!(gamma[(2, 4)], 0.5 * 9.8 * 3.0 * 3.0);
-        println!("gamma = {}", gamma);
     }
 
     #[test]
@@ -149,8 +151,19 @@ mod tests {
         assert_eq!(mat, expected);
     }
 
-    fn numerical_exp_se23(xi: &Vector9<f64>) {
-        // let wedge = wedge_se23(xi);
+    fn numerical_exp_se23(xi: &Vector9<f64>) -> SMatrix::<f64, 5, 5> {
+        let n_max = 200;
+        let wedge = wedge_se23(xi);
+
+        let mut exp = SMatrix::<f64, 5, 5>::identity();
+        for n in 1..n_max {
+            let mut power = SMatrix::<f64, 5, 5>::identity();
+            for i in 1..=n {
+                power = power * wedge / (i as f64);
+            }
+            exp += power;
+        }
+        exp
     }
 
     #[test]
@@ -177,22 +190,53 @@ mod tests {
 
     #[test]
     fn test_wedge_se23() {
-        // let xi = Vector9::<f64>::new(&[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]);
+        let xi = Vector9::<f64>::from_data(
+            ArrayStorage([[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]]));
 
-        // let wedge = wedge_se23(&xi);
-        // let expected = SMatrix::<f64, 5, 5>::new(
-        //     0.0, -0.3, 0.2, 0.4, 0.7,
-        //     0.3, 0.0, -0.1, 0.5, 0.8,
-        //     -0.2, 0.1, 0.0, 0.6, 0.9,
-        //     0.0, 0.0, 0.0, 0.0, 0.0,
-        //     0.0, 0.0, 0.0, 0.0, 0.0,
-        // );
+        let wedge = wedge_se23(&xi);
+        let expected = SMatrix::<f64, 5, 5>::new(
+            0.0, -0.3, 0.2, 0.4, 0.7,
+            0.3, 0.0, -0.1, 0.5, 0.8,
+            -0.2, 0.1, 0.0, 0.6, 0.9,
+            0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0,
+        );
 
-        // assert_eq!(wedge, expected);
+        assert_eq!(wedge, expected);
     }
 
     #[test]
     fn test_left_jacobian() {
+        let xi = Vector9::<f64>::from_data(
+            ArrayStorage([[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]]));
+
+        let exp = numerical_exp_se23(&xi);
+
+        let phi = xi.fixed_view::<3, 1>(0, 0).into();
+        let nu = xi.fixed_view::<3, 1>(3, 0);
+        let rho = xi.fixed_view::<3, 1>(6, 0);
+
+        let j = left_jacobian(&phi);
+
+        assert!((j * nu - exp.fixed_view::<3, 1>(0, 3)).norm() < 1e-8);
+        assert!((j * rho - exp.fixed_view::<3, 1>(0, 4)).norm() < 1e-8);
+    }
+
+    #[test]
+    fn test_left_jacobian_small_phi() {
+        let xi = Vector9::<f64>::from_data(
+            ArrayStorage([[1e-8, 2e-8, 3e-8, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]]));
+
+        let exp = numerical_exp_se23(&xi);
+
+        let phi = xi.fixed_view::<3, 1>(0, 0).into();
+        let nu = xi.fixed_view::<3, 1>(3, 0);
+        let rho = xi.fixed_view::<3, 1>(6, 0);
+
+        let j = left_jacobian(&phi);
+
+        assert!((j * nu - exp.fixed_view::<3, 1>(0, 3)).norm() < 1e-10);
+        assert!((j * rho - exp.fixed_view::<3, 1>(0, 4)).norm() < 1e-10);
     }
 
     #[test]
