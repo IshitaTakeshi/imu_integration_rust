@@ -262,5 +262,19 @@ mod tests {
     }
 
     #[test]
-    fn test_adjoint() {}
+    fn test_adjoint() {
+        let xi = Vector9::<f64>::from_data(ArrayStorage([[
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+        ]]));
+
+        let v = Vector9::<f64>::from_data(ArrayStorage([[
+            0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39,
+        ]]));
+        let transform = numerical_exp_se23(&v);
+        let inv_transform = numerical_exp_se23(&(-v));
+
+        let m1 = transform * numerical_exp_se23(&xi) * inv_transform;
+        let m2 = numerical_exp_se23(&(adjoint(&transform) * xi));
+        assert!((m1 - m2).norm() < 1e-6);
+    }
 }
