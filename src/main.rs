@@ -1,39 +1,44 @@
-use nalgebra::{Const, Matrix, SMatrix, Vector3, ArrayStorage};
+#![feature(stmt_expr_attributes)]
+
+use nalgebra::{ArrayStorage, Const, Matrix, SMatrix, Vector3};
 
 pub type Vector9<T> = Matrix<T, Const<9>, Const<1>, ArrayStorage<T, 9, 1>>;
 
-const GRAVITY: Vector3::<f64> = Vector3::<f64>::new(0.0, 0.0, 9.8);
+const GRAVITY: Vector3<f64> = Vector3::<f64>::new(0.0, 0.0, 9.8);
 
 // fn get_rot(transform: &SMatrix::<f64, 5, 5>) -> SMatrix::<f64, 3, 3> {
 //     transform.fixed_view::<3, 3>(0, 0)
 // }
 
-fn identity<const D: usize>() -> SMatrix::<f64, D, D> {
+fn identity<const D: usize>() -> SMatrix<f64, D, D> {
     SMatrix::<f64, D, D>::identity()
 }
 
-fn gamma(t: f64) -> SMatrix::<f64, 5, 5> {
+fn gamma(t: f64) -> SMatrix<f64, 5, 5> {
     let mut gamma = identity::<5>();
     gamma.fixed_view_mut::<3, 1>(0, 3).copy_from(&(GRAVITY * t));
-    gamma.fixed_view_mut::<3, 1>(0, 4).copy_from(&(0.5 * GRAVITY * t * t));
+    gamma
+        .fixed_view_mut::<3, 1>(0, 4)
+        .copy_from(&(0.5 * GRAVITY * t * t));
     gamma
 }
 
-fn phi(transform: &SMatrix::<f64, 5, 5>, dt: f64) -> SMatrix::<f64, 5, 5> {
+fn phi(transform: &SMatrix<f64, 5, 5>, dt: f64) -> SMatrix<f64, 5, 5> {
     let v = transform.fixed_view::<3, 1>(0, 3);
     let mut d = SMatrix::<f64, 5, 5>::zeros();
     d.fixed_view_mut::<3, 1>(0, 4).copy_from(&(v * dt));
     transform + d
 }
 
-fn make_f(t: f64) -> SMatrix::<f64, 9, 9> {
+fn make_f(t: f64) -> SMatrix<f64, 9, 9> {
     let identity3 = SMatrix::<f64, 3, 3>::identity();
     let mut f = SMatrix::<f64, 9, 9>::identity();
     f.fixed_view_mut::<3, 3>(6, 3).copy_from(&(identity3 * t));
     f
 }
 
-fn wedge_so3(v: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
+fn wedge_so3(v: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
+    #[rustfmt::skip]
     SMatrix::<f64, 3, 3>::new(
         0., -v[2], v[1],
         v[2], 0., -v[0],
@@ -41,7 +46,7 @@ fn wedge_so3(v: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
     )
 }
 
-fn wedge_se23(xi: &Vector9<f64>) -> SMatrix::<f64, 5, 5> {
+fn wedge_se23(xi: &Vector9<f64>) -> SMatrix<f64, 5, 5> {
     let phi = xi.fixed_view::<3, 1>(0, 0).into();
     let nu = xi.fixed_view::<3, 1>(3, 0);
     let rho = xi.fixed_view::<3, 1>(6, 0);
@@ -55,7 +60,7 @@ fn wedge_se23(xi: &Vector9<f64>) -> SMatrix::<f64, 5, 5> {
     wedge
 }
 
-fn left_jacobian(rotvec: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
+fn left_jacobian(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
     let epsilon = 1e-6;
     let norm = rotvec.norm();
 
@@ -71,7 +76,7 @@ fn left_jacobian(rotvec: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
         + ((norm - f64::sin(norm)) / (norm * norm * norm)) * wedge * wedge
 }
 
-fn exp_so3(rotvec: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
+fn exp_so3(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
     let epsilon = 1e-6;
     let norm = rotvec.norm();
 
@@ -83,7 +88,7 @@ fn exp_so3(rotvec: &Vector3<f64>) -> SMatrix::<f64, 3, 3> {
     identity3 + f64::sin(norm) * wedge + (1. - f64::cos(norm)) * wedge * wedge
 }
 
-fn exp_se23(xi: &Vector9<f64>) -> SMatrix::<f64, 5, 5> {
+fn exp_se23(xi: &Vector9<f64>) -> SMatrix<f64, 5, 5> {
     let phi = xi.fixed_view::<3, 1>(0, 0).into();
     let nu = xi.fixed_view::<3, 1>(3, 0);
     let rho = xi.fixed_view::<3, 1>(6, 0);
@@ -93,12 +98,16 @@ fn exp_se23(xi: &Vector9<f64>) -> SMatrix::<f64, 5, 5> {
 
     let mut transform = SMatrix::<f64, 5, 5>::identity();
     transform.fixed_view_mut::<3, 3>(0, 0).copy_from(&rot);
-    transform.fixed_view_mut::<3, 1>(0, 3).copy_from(&(jacobian * nu));
-    transform.fixed_view_mut::<3, 1>(0, 4).copy_from(&(jacobian * rho));
+    transform
+        .fixed_view_mut::<3, 1>(0, 3)
+        .copy_from(&(jacobian * nu));
+    transform
+        .fixed_view_mut::<3, 1>(0, 4)
+        .copy_from(&(jacobian * rho));
     transform
 }
 
-fn adjoint(transform: &SMatrix::<f64, 5, 5>) -> SMatrix::<f64, 9, 9> {
+fn adjoint(transform: &SMatrix<f64, 5, 5>) -> SMatrix<f64, 9, 9> {
     let rot = transform.fixed_view::<3, 3>(0, 0);
     let v = transform.fixed_view::<3, 1>(0, 3).into();
     let p = transform.fixed_view::<3, 1>(0, 4).into();
@@ -107,8 +116,12 @@ fn adjoint(transform: &SMatrix::<f64, 5, 5>) -> SMatrix::<f64, 9, 9> {
     adjoint.fixed_view_mut::<3, 3>(0, 0).copy_from(&(rot));
     adjoint.fixed_view_mut::<3, 3>(3, 3).copy_from(&(rot));
     adjoint.fixed_view_mut::<3, 3>(6, 6).copy_from(&(rot));
-    adjoint.fixed_view_mut::<3, 3>(3, 0).copy_from(&(wedge_so3(&v) * rot));
-    adjoint.fixed_view_mut::<3, 3>(6, 0).copy_from(&(wedge_so3(&p) * rot));
+    adjoint
+        .fixed_view_mut::<3, 3>(3, 0)
+        .copy_from(&(wedge_so3(&v) * rot));
+    adjoint
+        .fixed_view_mut::<3, 3>(6, 0)
+        .copy_from(&(wedge_so3(&p) * rot));
     adjoint
 }
 
@@ -143,6 +156,8 @@ mod tests {
     #[test]
     fn test_wedge_so3() {
         let mat = wedge_so3(&Vector3::new(0.3, 0.5, 0.7));
+
+        #[rustfmt::skip]
         let expected = SMatrix::<f64, 3, 3>::new(
             0.0, -0.7, 0.5,
             0.7, 0.0, -0.3,
@@ -151,7 +166,7 @@ mod tests {
         assert_eq!(mat, expected);
     }
 
-    fn numerical_exp_se23(xi: &Vector9<f64>) -> SMatrix::<f64, 5, 5> {
+    fn numerical_exp_se23(xi: &Vector9<f64>) -> SMatrix<f64, 5, 5> {
         let n_max = 200;
         let wedge = wedge_se23(xi);
 
@@ -168,6 +183,7 @@ mod tests {
 
     #[test]
     fn test_phi() {
+        #[rustfmt::skip]
         let transform = SMatrix::<f64, 5, 5>::new(
             1., 0., 0., 2., 6.,
             0., 1., 0., 4., 5.,
@@ -176,6 +192,7 @@ mod tests {
             0., 0., 0., 0., 1.,
         );
 
+        #[rustfmt::skip]
         let expected = SMatrix::<f64, 5, 5>::new(
             1., 0., 0., 2., 7.,
             0., 1., 0., 4., 7.,
@@ -190,10 +207,13 @@ mod tests {
 
     #[test]
     fn test_wedge_se23() {
-        let xi = Vector9::<f64>::from_data(
-            ArrayStorage([[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]]));
+        let xi = Vector9::<f64>::from_data(ArrayStorage([[
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+        ]]));
 
         let wedge = wedge_se23(&xi);
+
+        #[rustfmt::skip]
         let expected = SMatrix::<f64, 5, 5>::new(
             0.0, -0.3, 0.2, 0.4, 0.7,
             0.3, 0.0, -0.1, 0.5, 0.8,
@@ -207,8 +227,9 @@ mod tests {
 
     #[test]
     fn test_left_jacobian() {
-        let xi = Vector9::<f64>::from_data(
-            ArrayStorage([[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]]));
+        let xi = Vector9::<f64>::from_data(ArrayStorage([[
+            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+        ]]));
 
         let exp = numerical_exp_se23(&xi);
 
@@ -224,8 +245,9 @@ mod tests {
 
     #[test]
     fn test_left_jacobian_small_phi() {
-        let xi = Vector9::<f64>::from_data(
-            ArrayStorage([[1e-8, 2e-8, 3e-8, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]]));
+        let xi = Vector9::<f64>::from_data(ArrayStorage([[
+            1e-8, 2e-8, 3e-8, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+        ]]));
 
         let exp = numerical_exp_se23(&xi);
 
@@ -240,6 +262,5 @@ mod tests {
     }
 
     #[test]
-    fn test_adjoint() {
-    }
+    fn test_adjoint() {}
 }
