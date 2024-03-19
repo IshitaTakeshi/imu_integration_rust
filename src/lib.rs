@@ -4,7 +4,7 @@ use nalgebra::{ArrayStorage, Const, Matrix, SMatrix, Vector3};
 
 pub type Vector9<T> = Matrix<T, Const<9>, Const<1>, ArrayStorage<T, 9, 1>>;
 
-const GRAVITY: Vector3<f64> = Vector3::<f64>::new(0.0, 0.0, 9.8);
+const GRAVITY: Vector3<f64> = Vector3::<f64>::new(0.0, 0.0, -9.8);
 
 // fn get_rot(transform: &SMatrix::<f64, 5, 5>) -> SMatrix::<f64, 3, 3> {
 //     transform.fixed_view::<3, 3>(0, 0)
@@ -149,8 +149,8 @@ mod tests {
     #[test]
     fn test_gamma() {
         let gamma = gamma(3.0);
-        assert_eq!(gamma[(2, 3)], 9.8 * 3.0);
-        assert_eq!(gamma[(2, 4)], 0.5 * 9.8 * 3.0 * 3.0);
+        assert_eq!(gamma[(2, 3)], -9.8 * 3.0);
+        assert_eq!(gamma[(2, 4)], -0.5 * 9.8 * 3.0 * 3.0);
     }
 
     #[test]
