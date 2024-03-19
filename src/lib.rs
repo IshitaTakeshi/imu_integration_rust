@@ -138,6 +138,35 @@ fn adjoint(transform: &SMatrix<f64, 5, 5>) -> SMatrix<f64, 9, 9> {
     adjoint
 }
 
+fn upsilon(
+    angular_velocity: &Vector3<f64>,
+    acceleration: &Vector3<f64>,
+    dt: f64,
+) -> SMatrix<f64, 5, 5> {
+    let mut upsilon = identity::<5>();
+    upsilon
+        .fixed_view_mut::<3, 3>(0, 0)
+        .copy_from(&exp_so3(&(angular_velocity * dt)));
+    upsilon
+        .fixed_view_mut::<3, 1>(0, 3)
+        .copy_from(&(acceleration * dt));
+    upsilon
+        .fixed_view_mut::<3, 1>(0, 4)
+        .copy_from(&(0.5 * acceleration * dt * dt));
+    upsilon
+}
+
+pub fn propagate(
+    transform: &SMatrix<f64, 5, 5>,
+    angular_velocity: &Vector3<f64>,
+    acceleration: &Vector3<f64>,
+    dt: f64,
+) -> SMatrix<f64, 5, 5> {
+    let gamma = gamma(dt);
+    let upsilon = upsilon(angular_velocity, acceleration, dt);
+    gamma * phi(transform, dt) * upsilon
+}
+
 fn main() {
     println!("Hello, world!");
 }
@@ -299,5 +328,24 @@ mod tests {
         let transform = numerical_exp_se23(&v);
         let inv_transform = numerical_exp_se23(&(-v));
         assert!((inverse_se23(&transform) - inv_transform).norm() < 1e-8);
+    }
+
+    fn test_upsilon() {
+        let dt = 0.5;
+        let angular_velocity = Vector3::<f64>::new(0., 0., 0.2);
+        let acceleration = Vector3::<f64>::new(0.5, 0.3, 0.1);
+
+        #[rustfmt::skip]
+        let expected = SMatrix::<f64, 5, 5>::new(
+            0.99500417, -0.09983342, 0.00000000, 0.2500, 0.0625,
+            0.09983342,  0.99500417, 0.00000000, 0.1500, 0.0375,
+            0.00000000,  0.00000000, 1.00000000, 0.0500, 0.0125,
+            0.00000000,  0.00000000, 0.00000000, 1.0000, 0.0000,
+            0.00000000,  0.00000000, 0.00000000, 0.0000, 1.0000,
+        );
+
+        let upsilon = upsilon(&angular_velocity, &acceleration, dt);
+
+        assert!((expected - upsilon).norm() < 1e-4);
     }
 }
