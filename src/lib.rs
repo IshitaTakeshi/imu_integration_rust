@@ -107,6 +107,19 @@ fn exp_se23(xi: &Vector9<f64>) -> SMatrix<f64, 5, 5> {
     transform
 }
 
+fn inverse_se23(transform: &SMatrix<f64, 5, 5>) -> SMatrix<f64, 5, 5> {
+    let nu_rho = transform.fixed_view::<3, 2>(0, 3);
+    let rot = transform.fixed_view::<3, 3>(0, 0);
+    let mut inverse = identity::<5>();
+    inverse
+        .fixed_view_mut::<3, 2>(0, 3)
+        .copy_from(&(-rot.transpose() * nu_rho));
+    inverse
+        .fixed_view_mut::<3, 3>(0, 0)
+        .copy_from(&rot.transpose());
+    inverse
+}
+
 fn adjoint(transform: &SMatrix<f64, 5, 5>) -> SMatrix<f64, 9, 9> {
     let rot = transform.fixed_view::<3, 3>(0, 0);
     let v = transform.fixed_view::<3, 1>(0, 3).into();
@@ -276,5 +289,15 @@ mod tests {
         let m1 = transform * numerical_exp_se23(&xi) * inv_transform;
         let m2 = numerical_exp_se23(&(adjoint(&transform) * xi));
         assert!((m1 - m2).norm() < 1e-6);
+    }
+
+    #[test]
+    fn test_inverse_se23() {
+        let v = Vector9::<f64>::from_data(ArrayStorage([[
+            0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39,
+        ]]));
+        let transform = numerical_exp_se23(&v);
+        let inv_transform = numerical_exp_se23(&(-v));
+        assert!((inverse_se23(&transform) - inv_transform).norm() < 1e-8);
     }
 }
