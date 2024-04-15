@@ -10,7 +10,7 @@ const GRAVITY: Vector3<f64> = Vector3::<f64>::new(0.0, 0.0, -9.8);
 //     transform.fixed_view::<3, 3>(0, 0)
 // }
 
-fn identity<const D: usize>() -> SMatrix<f64, D, D> {
+pub fn identity<const D: usize>() -> SMatrix<f64, D, D> {
     SMatrix::<f64, D, D>::identity()
 }
 
@@ -74,6 +74,10 @@ fn left_jacobian(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
     identity3
         + ((1. - f64::cos(norm)) / (norm * norm)) * wedge
         + ((norm - f64::sin(norm)) / (norm * norm * norm)) * wedge * wedge
+}
+
+fn right_jacobian(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
+    left_jacobian(&(-rotvec))
 }
 
 fn exp_so3(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
