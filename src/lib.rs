@@ -273,6 +273,12 @@ mod tests {
 
     #[test]
     fn test_left_jacobian() {
+        // test the definition of the exponential map of se(3)
+        //
+        // exp_se23([phi, nu, rho])
+        //   [exp_so3(phi)  JL(phi) * nu  JL(phi) * rho ]
+        // = [0    0    0         1             0       ]
+        //   [0    0    0         0             1       ]
         let xi = Vector9::<f64>::from_data(ArrayStorage([[
             0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
         ]]));
@@ -334,6 +340,7 @@ mod tests {
         assert!((inverse_se23(&transform) - inv_transform).norm() < 1e-8);
     }
 
+    #[test]
     fn test_upsilon() {
         let dt = 0.5;
         let angular_velocity = Vector3::<f64>::new(0., 0., 0.2);
