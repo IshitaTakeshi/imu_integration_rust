@@ -1,4 +1,4 @@
-use imu_preintegration::{identity, propagate};
+use crate::{identity, propagate};
 use nalgebra::geometry::{Quaternion, UnitQuaternion};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
@@ -195,14 +195,62 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::exp_so3;
 
     #[test]
     fn test_is_widthin() {
-        assert!(!is_widthin([], 0));
-        assert!(!is_widthin([0], 0));
-        assert!(is_widthin([0, 1], 0));
+        assert!(!is_widthin(&[], &0));
+        assert!(!is_widthin(&[0], &0));
 
-        assert!(!is_widthin([0, 1], -1));
-        assert!(!is_widthin([0, 1], 0));
+        assert!(is_widthin(&[0, 1], &0));
+        assert!(is_widthin(&[0, 1], &1));
+
+        assert!(!is_widthin(&[0, 1], &-1));
+        assert!(!is_widthin(&[0, 1], &2));
+    }
+
+    const PI: f64 = std::f64::consts::PI;
+
+    fn quaternion(t: f64) -> UnitQuaternion<f64> {
+        let x = f64::sin(2. * PI * 1. * t);
+        let y = f64::sin(2. * PI * 2. * t);
+        let z = f64::sin(2. * PI * 3. * t);
+        let w = 1.0 - (x * x + y * y + z * z);
+        UnitQuaternion::new_normalize(Quaternion::new(w, x, y, z))
+    }
+
+    const DELTA_T: f64 = 0.01;
+    fn time(i: usize) -> f64 {
+        DELTA_T * (i as f64)
+    }
+
+    #[test]
+    fn test_integration() {
+        // Generate a trajectory from a to b on a unit sphere
+        // (homomorphic to the set of unit quaternions).
+
+        let a = 0;
+        let b = 1000;
+        let qa = quaternion(time(a));
+        let qb = quaternion(time(b));
+
+        let mut q = qa;
+        for i in a..b {
+            let t0 = time(i + 0);
+            let t1 = time(i + 1);
+            let q0 = quaternion(t0);
+            let q1 = quaternion(t1);
+            let dq = q0.inverse() * q1;
+
+            // Compute the numerical derivative of the rotation
+            let dt = t1 - t0;
+            let omega = dq.scaled_axis() / dt;
+
+            let dq = UnitQuaternion::from_scaled_axis(omega * dt);
+
+            q = q * dq;
+        }
+
+        assert!(f64::abs((qb.inverse() * q).angle()) < 1e-8);
     }
 }

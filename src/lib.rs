@@ -1,5 +1,7 @@
 #![feature(stmt_expr_attributes)]
 
+mod integration;
+
 use nalgebra::{ArrayStorage, Const, Matrix, SMatrix, Vector3};
 
 pub type Vector9<T> = Matrix<T, Const<9>, Const<1>, ArrayStorage<T, 9, 1>>;
