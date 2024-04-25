@@ -301,17 +301,21 @@ impl GyroscopeGenerator {
         GyroscopeGenerator { t: t, f: f }
     }
 
-    fn get(&self, i: usize) -> (Vector3<f64>, f64) {
-        let t0 = (self.t)(i + 0);
-        let t1 = (self.t)(i + 1);
-        let q0 = (self.f)(t0);
-        let q1 = (self.f)(t1);
+    fn angular_velocity(&self, i: usize) -> (f64, Vector3<f64>) {
+        let (t0, q0) = self.rotation(i + 0);
+        let (t1, q1) = self.rotation(i + 1);
         let dq = q0.inverse() * q1;
 
         // Compute the numerical derivative of the rotation
         let dt = t1 - t0;
         let omega = dq.scaled_axis() / dt;
-        (omega, dt)
+        (t0, omega)
+    }
+
+    fn rotation(&self, i: usize) -> (f64, UnitQuaternion<f64>) {
+        let t = (self.t)(i);
+        let q = (self.f)(t);
+        (t, q)
     }
 }
 
@@ -338,7 +342,10 @@ mod tests {
         let x = f64::sin(2. * PI * 1. * t);
         let y = f64::sin(2. * PI * 2. * t);
         let z = f64::sin(2. * PI * 3. * t);
-        let w = 1.0 - (x * x + y * y + z * z);
+        let w2 = 1.0 - (1. / 3.) * (x * x + y * y + z * z);
+        assert!(w2 > 0.0);
+        let w = f64::sqrt(w2);
+
         UnitQuaternion::new_normalize(Quaternion::new(w, x, y, z))
     }
 
@@ -352,15 +359,18 @@ mod tests {
         // Generate a trajectory from a to b on a unit sphere
         // (homomorphic to the set of unit quaternions).
 
+        let generator = GyroscopeGenerator::new(time, quat);
+
         let a = 0;
         let b = 1000;
-        let qa = quat(time(a));
-        let qb = quat(time(b));
 
-        let generator = GyroscopeGenerator::new(time, quat);
+        let (ta, qa) = generator.rotation(a);
+        let (tb, qb) = generator.rotation(b);
+
         let mut q = qa;
         for i in a..b {
-            let (omega, dt) = generator.get(i);
+            let dt = time(i + 1) - time(i + 0);
+            let (t, omega) = generator.angular_velocity(i);
             let dq = UnitQuaternion::from_scaled_axis(omega * dt);
 
             q = q * dq;
@@ -373,19 +383,17 @@ mod tests {
     fn test_residual_without_time_offset() {
         let a = 0;
         let b = 1000;
-        let ta = time(a);
-        let tb = time(b);
-        let qa = quat(ta);
-        let qb = quat(tb);
 
         let mut interface = GyroInterface::new();
-        interface.add_start_reference_pose(ta, &qa);
 
         let generator = GyroscopeGenerator::new(time, quat);
+        let (ta, qa) = generator.rotation(a);
+        let (tb, qb) = generator.rotation(b);
+
+        interface.add_start_reference_pose(ta, &qa);
         for i in a..b {
-            let (omega, dt) = generator.get(i);
-            let t0 = time(i + 0);
-            interface.add_gyroscope(t0, &omega);
+            let (t, omega) = generator.angular_velocity(i);
+            interface.add_gyroscope(t, &omega);
         }
 
         interface.add_end_reference_pose(tb, &qb);
