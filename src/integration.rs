@@ -106,15 +106,6 @@ fn has_corresponding_imu_timestamp<T: std::cmp::PartialOrd + std::cmp::Ord>(
     imu_timestamps.binary_search(&query_timestamp).is_ok()
 }
 
-struct GyroInterface {
-    r_wb_i: Option<UnitQuaternion<f64>>,
-    r_wb_j: Option<UnitQuaternion<f64>>,
-    ti: Option<f64>,
-    tj: Option<f64>,
-    timestamps: Vec<f64>,
-    angular_velocities: Vec<Vector3<f64>>,
-}
-
 fn interpolate(t0: f64, t1: f64, t: f64, w0: &Vector3<f64>, w1: &Vector3<f64>) -> Vector3<f64> {
     assert!(t1 != t0);
     ((t1 - t) * w0 + (t - t0) * w1) / (t1 - t0)
@@ -129,74 +120,16 @@ fn check_timestamps(timestamps: &[f64], ti: f64, tj: f64) {
     assert!(tj <= timestamps[n - 1]);
 }
 
-fn compute_dts(timestamps: &[f64], ti: f64, tj: f64) -> Vec<f64> {
+fn compute_timestamps(timestamps: &[f64], ti: f64, tj: f64) -> Vec<f64> {
     check_timestamps(timestamps, ti, tj);
 
     let n = timestamps.len();
 
-    let mut dts = Vec::<f64>::new();
-    dts.push(timestamps[1] - ti);
-    for k in 1..n - 2 {
-        dts.push(timestamps[k + 1] - timestamps[k]);
-    }
-    dts.push(tj - timestamps[n - 2]);
-    dts
-}
-
-impl GyroInterface {
-    fn new() -> Self {
-        GyroInterface {
-            r_wb_i: None,
-            r_wb_j: None,
-            ti: None,
-            tj: None,
-            timestamps: Vec::<f64>::new(),
-            angular_velocities: Vec::<Vector3<f64>>::new(),
-        }
-    }
-    fn add_start_reference_pose(&mut self, t: f64, q: &UnitQuaternion<f64>) {
-        self.ti = Some(t);
-        self.r_wb_i = Some(*q);
-    }
-
-    fn add_end_reference_pose(&mut self, t: f64, q: &UnitQuaternion<f64>) {
-        self.tj = Some(t);
-        self.r_wb_j = Some(*q);
-    }
-
-    fn add_gyroscope(&mut self, t: f64, w: &Vector3<f64>) {
-        match self.timestamps.last() {
-            Some(last) => assert!(*last < t),
-            None => (),
-        }
-        self.timestamps.push(t);
-        self.angular_velocities.push(*w);
-    }
-
-    fn make(&mut self) -> Option<Gyro> {
-        let n = self.angular_velocities.len();
-        let tf0 = self.timestamps[0];
-        let tf1 = self.timestamps[1];
-        let tl0 = self.timestamps[n - 2];
-        let tl1 = self.timestamps[n - 1];
-        let wf0 = self.angular_velocities[0];
-        let wf1 = self.angular_velocities[1];
-        let wl0 = self.angular_velocities[n - 2];
-        let wl1 = self.angular_velocities[n - 1];
-
-        let mut angular_velocities = &mut self.angular_velocities;
-        angular_velocities[0] = interpolate(tf0, tf1, self.ti?, &wf0, &wf1);
-        angular_velocities[n - 1] = interpolate(tl0, tl1, self.tj?, &wl0, &wl1);
-
-        let dts = compute_dts(&self.timestamps, self.ti?, self.tj?);
-        let gyro = Gyro::new(
-            &self.r_wb_i?,
-            &self.r_wb_j?,
-            dts,
-            angular_velocities.to_vec(),
-        );
-        Some(gyro)
-    }
+    let mut ts = Vec::<f64>::new();
+    ts.push(ti);
+    ts.extend(&timestamps[1..n - 1]);
+    ts.push(tj);
+    ts
 }
 
 struct Gyro {
@@ -224,6 +157,7 @@ impl Gyro {
     fn integrate(&self) {
         for i in 0..self.dts.len() {
             let dt = self.dts[i];
+            let omega = self.angular_velocities[i];
         }
     }
 
@@ -291,38 +225,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-struct GyroscopeGenerator {
-    t: fn(usize) -> f64,
-    f: fn(f64) -> UnitQuaternion<f64>,
-}
-
-impl GyroscopeGenerator {
-    fn new(t: fn(usize) -> f64, f: fn(f64) -> UnitQuaternion<f64>) -> Self {
-        GyroscopeGenerator { t: t, f: f }
-    }
-
-    fn angular_velocity(&self, i: usize) -> (f64, Vector3<f64>) {
-        let (t0, q0) = self.rotation(i + 0);
-        let (t1, q1) = self.rotation(i + 1);
-        let dq = q0.inverse() * q1;
-
-        // Compute the numerical derivative of the rotation
-        let dt = t1 - t0;
-        let omega = dq.scaled_axis() / dt;
-        (t0, omega)
-    }
-
-    fn rotation(&self, i: usize) -> (f64, UnitQuaternion<f64>) {
-        let t = (self.t)(i);
-        let q = (self.f)(t);
-        (t, q)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exp_so3;
 
     #[test]
     fn test_is_widthin() {
@@ -336,80 +241,17 @@ mod tests {
         assert!(!is_widthin(&[0, 1], &2));
     }
 
-    const PI: f64 = std::f64::consts::PI;
-
-    fn quat(t: f64) -> UnitQuaternion<f64> {
-        let x = f64::sin(2. * PI * 1. * t);
-        let y = f64::sin(2. * PI * 2. * t);
-        let z = f64::sin(2. * PI * 3. * t);
-        let w2 = 1.0 - (1. / 3.) * (x * x + y * y + z * z);
-        assert!(w2 > 0.0);
-        let w = f64::sqrt(w2);
-
-        UnitQuaternion::new_normalize(Quaternion::new(w, x, y, z))
-    }
-
-    const DELTA_T: f64 = 0.01;
-    fn time(i: usize) -> f64 {
-        DELTA_T * (i as f64)
-    }
-
     #[test]
-    fn test_integration() {
-        // Generate a trajectory from a to b on a unit sphere
-        // (homomorphic to the set of unit quaternions).
-
-        let generator = GyroscopeGenerator::new(time, quat);
-
-        let a = 0;
-        let b = 1000;
-
-        let (ta, qa) = generator.rotation(a);
-        let (tb, qb) = generator.rotation(b);
-
-        let mut q = qa;
-        for i in a..b {
-            let dt = time(i + 1) - time(i + 0);
-            let (t, omega) = generator.angular_velocity(i);
-            let dq = UnitQuaternion::from_scaled_axis(omega * dt);
-
-            q = q * dq;
-        }
-
-        assert!(f64::abs((qb.inverse() * q).angle()) < 1e-8);
-    }
-
-    #[test]
-    fn test_residual_without_time_offset() {
-        let a = 0;
-        let b = 1000;
-
-        let mut interface = GyroInterface::new();
-
-        let generator = GyroscopeGenerator::new(time, quat);
-        let (ta, qa) = generator.rotation(a);
-        let (tb, qb) = generator.rotation(b);
-
-        interface.add_start_reference_pose(ta, &qa);
-        for i in a..b {
-            let (t, omega) = generator.angular_velocity(i);
-            interface.add_gyroscope(t, &omega);
-        }
-
-        interface.add_end_reference_pose(tb, &qb);
-    }
-
-    #[test]
-    fn test_compute_dts() {
+    fn test_compute_timestamps() {
         let timestamps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
         let ti = 0.12;
         let tj = 0.57;
-        let dts = compute_dts(&timestamps, ti, tj);
-        let expected = [0.08, 0.1, 0.1, 0.1, 0.07];
-        assert_eq!(dts.len(), expected.len());
+        let timestamps = compute_timestamps(&timestamps, ti, tj);
+        let expected = [0.12, 0.2, 0.3, 0.4, 0.5, 0.57];
+        assert_eq!(timestamps.len(), expected.len());
 
-        for (dt, e) in dts.iter().zip(expected.iter()) {
-            assert!(f64::abs(dt - e) < 1e-16);
+        for (t, e) in timestamps.iter().zip(expected.iter()) {
+            assert!(f64::abs(t - e) < 1e-16);
         }
     }
 
