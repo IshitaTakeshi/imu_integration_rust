@@ -217,4 +217,75 @@ mod tests {
             None => assert!(false),
         }
     }
+
+    #[test]
+    fn test_get_with_both_time_offsets() {
+        let mut interface = GyroInterface::new();
+
+        let generator = GyroscopeGenerator::new(time, quat);
+
+        for i in [2, 4, 6, 8, 10, 12].iter() {
+            let (t, omega) = generator.angular_velocity(*i);
+            interface.add_gyroscope(t, &omega);
+        }
+
+        let (ta, qa) = generator.rotation(5);
+        interface.add_reference_pose(ta, &qa);
+
+        let (tb, qb) = generator.rotation(9);
+        interface.add_reference_pose(tb, &qb);
+
+        match interface.get() {
+            Some((ts, ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_get_only_start_time_offset() {
+        let mut interface = GyroInterface::new();
+
+        let generator = GyroscopeGenerator::new(time, quat);
+
+        for i in [2, 4, 6, 8, 10, 12].iter() {
+            let (t, omega) = generator.angular_velocity(*i);
+            interface.add_gyroscope(t, &omega);
+        }
+
+        let (ta, qa) = generator.rotation(5);
+        interface.add_reference_pose(ta, &qa);
+
+        let (tb, qb) = generator.rotation(10);
+        interface.add_reference_pose(tb, &qb);
+
+        // Include 0.04 to generate the interpolated angular velocity for 0.05
+        match interface.get() {
+            Some((ts, ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_get_only_end_time_offset() {
+        let mut interface = GyroInterface::new();
+
+        let generator = GyroscopeGenerator::new(time, quat);
+
+        for i in [2, 4, 6, 8, 10, 12].iter() {
+            let (t, omega) = generator.angular_velocity(*i);
+            interface.add_gyroscope(t, &omega);
+        }
+
+        let (ta, qa) = generator.rotation(4);
+        interface.add_reference_pose(ta, &qa);
+
+        let (tb, qb) = generator.rotation(9);
+        interface.add_reference_pose(tb, &qb);
+
+        // Include 0.10 to generate the interpolated angular velocity for 0.09
+        match interface.get() {
+            Some((ts, ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            None => assert!(false),
+        }
+    }
 }
