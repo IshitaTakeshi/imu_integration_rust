@@ -5,6 +5,7 @@ mod integratable;
 mod integration;
 mod interface;
 mod interpolation;
+mod residual;
 
 use nalgebra::{ArrayStorage, Const, Matrix, SMatrix, Vector3};
 
