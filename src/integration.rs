@@ -106,27 +106,6 @@ fn has_corresponding_imu_timestamp<T: std::cmp::PartialOrd + std::cmp::Ord>(
     imu_timestamps.binary_search(&query_timestamp).is_ok()
 }
 
-fn check_timestamps(timestamps: &[f64], ti: f64, tj: f64) {
-    let n = timestamps.len();
-    assert!(n >= 3);
-    assert!(timestamps[0] <= ti);
-    assert!(ti < timestamps[1]);
-    assert!(timestamps[n - 2] < tj);
-    assert!(tj <= timestamps[n - 1]);
-}
-
-fn compute_timestamps(timestamps: &[f64], ti: f64, tj: f64) -> Vec<f64> {
-    check_timestamps(timestamps, ti, tj);
-
-    let n = timestamps.len();
-
-    let mut ts = Vec::<f64>::new();
-    ts.push(ti);
-    ts.extend(&timestamps[1..n - 1]);
-    ts.push(tj);
-    ts
-}
-
 struct Gyro {
     r_wb_i: UnitQuaternion<f64>,
     r_wb_j: UnitQuaternion<f64>,
@@ -238,19 +217,5 @@ mod tests {
 
         assert!(!is_widthin(&[0, 1], &-1));
         assert!(!is_widthin(&[0, 1], &2));
-    }
-
-    #[test]
-    fn test_compute_timestamps() {
-        let timestamps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
-        let ti = 0.12;
-        let tj = 0.57;
-        let timestamps = compute_timestamps(&timestamps, ti, tj);
-        let expected = [0.12, 0.2, 0.3, 0.4, 0.5, 0.57];
-        assert_eq!(timestamps.len(), expected.len());
-
-        for (t, e) in timestamps.iter().zip(expected.iter()) {
-            assert!(f64::abs(t - e) < 1e-16);
-        }
     }
 }

@@ -33,8 +33,18 @@ fn concat<T: Copy>(i: T, mid: &[T], j: T) -> Vec<T> {
     array
 }
 
+fn check_timestamps(timestamps: &[f64], ti: f64, tj: f64) {
+    let n = timestamps.len();
+    assert!(n >= 3);
+    assert!(timestamps[0] <= ti);
+    assert!(ti < timestamps[1]);
+    assert!(timestamps[n - 2] < tj);
+    assert!(tj <= timestamps[n - 1]);
+}
+
 impl Integratable {
     fn new_interpolated(ts: &[f64], ws: &[Vector3<f64>], ti: f64, tj: f64) -> Self {
+        check_timestamps(ts, ti, tj);
         assert_eq!(ts.len(), ws.len());
         let n = ws.len();
         let wi = interpolate(ts[0], ts[1], ti, &ws[0], &ws[1]);
