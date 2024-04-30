@@ -1,4 +1,5 @@
 use crate::generator::GyroscopeGenerator;
+use crate::integration;
 use nalgebra::{UnitQuaternion, Vector3};
 use std::collections::VecDeque;
 
@@ -55,6 +56,10 @@ impl Integratable {
             ts: ts_new,
             ws: ws_new,
         }
+    }
+
+    fn integrate_euler(&self) -> UnitQuaternion<f64> {
+        integration::integrate_euler(&self.ts, &self.ws)
     }
 }
 
@@ -258,7 +263,7 @@ mod tests {
         interface.add_reference_pose(tb, &qb);
 
         match interface.get() {
-            Some((ts, ws)) => assert_eq!(ts, [0.05, 0.06, 0.07]),
+            Some((ts, _ws)) => assert_eq!(ts, [0.05, 0.06, 0.07]),
             None => assert!(false),
         }
     }
@@ -281,7 +286,7 @@ mod tests {
         interface.add_reference_pose(tb, &qb);
 
         match interface.get() {
-            Some((ts, ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
             None => assert!(false),
         }
     }
@@ -305,7 +310,7 @@ mod tests {
 
         // Include 0.04 to generate the interpolated angular velocity for 0.05
         match interface.get() {
-            Some((ts, ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
             None => assert!(false),
         }
     }
@@ -329,7 +334,7 @@ mod tests {
 
         // Include 0.10 to generate the interpolated angular velocity for 0.09
         match interface.get() {
-            Some((ts, ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
             None => assert!(false),
         }
     }

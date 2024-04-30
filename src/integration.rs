@@ -113,6 +113,36 @@ struct Gyro {
     angular_velocities: Vec<Vector3<f64>>,
 }
 
+pub fn integrate_euler(
+    timestamps: &[f64],
+    angular_velocities: &[Vector3<f64>],
+) -> UnitQuaternion<f64> {
+    let mut q = UnitQuaternion::identity();
+    for i in 0..timestamps.len() - 1 {
+        let dt = timestamps[i + 1] - timestamps[i + 0];
+        let w = angular_velocities[i];
+        let dq = UnitQuaternion::from_scaled_axis(w * dt);
+        q = q * dq;
+    }
+    q
+}
+
+fn integrate_midpoint(
+    timestamps: &[f64],
+    angular_velocities: &[Vector3<f64>],
+) -> UnitQuaternion<f64> {
+    let mut q = UnitQuaternion::identity();
+    for i in 0..timestamps.len() - 1 {
+        let dt = timestamps[i + 1] - timestamps[i + 0];
+        let w0 = angular_velocities[i + 0];
+        let w1 = angular_velocities[i + 1];
+        let w = 0.5 * (w0 + w1);
+        let dq = UnitQuaternion::from_scaled_axis(w * dt);
+        q = q * dq;
+    }
+    q
+}
+
 impl Gyro {
     fn new(
         r_wb_i: &UnitQuaternion<f64>,
@@ -206,6 +236,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::generator::GyroscopeGenerator;
+    use core::f64::consts::PI;
 
     #[test]
     fn test_is_widthin() {
@@ -217,5 +249,61 @@ mod tests {
 
         assert!(!is_widthin(&[0, 1], &-1));
         assert!(!is_widthin(&[0, 1], &2));
+    }
+
+    fn quat(t: f64) -> UnitQuaternion<f64> {
+        let x = f64::sin(2. * PI * 1. * t);
+        let y = f64::sin(2. * PI * 2. * t);
+        let z = f64::sin(2. * PI * 3. * t);
+        let w2 = 1.0 - (1. / 3.) * (x * x + y * y + z * z);
+        assert!(w2 > 0.0);
+        let w = f64::sqrt(w2);
+
+        UnitQuaternion::new_normalize(Quaternion::new(w, x, y, z))
+    }
+
+    const DELTA_T: f64 = 0.0001;
+    fn time(i: usize) -> f64 {
+        DELTA_T * (i as f64)
+    }
+
+    #[test]
+    fn test_integrate_euler() {
+        let generator = GyroscopeGenerator::new(time, quat);
+        let a = 0;
+        let b = 10000;
+        let (ta, qa) = generator.rotation(a);
+        let (tb, qb) = generator.rotation(b);
+
+        let mut timestamps = vec![];
+        let mut angular_velocities = vec![];
+        for i in (a..=b).step_by(10) {
+            // NOTE b is inclusive
+            let (t, w) = generator.angular_velocity(i);
+            timestamps.push(t);
+            angular_velocities.push(w);
+        }
+        let dq = integrate_euler(&timestamps, &angular_velocities);
+        assert!(f64::abs(((qa * dq).inverse() * qb).angle()) < 1e-4);
+    }
+
+    #[test]
+    fn test_integrate_midpoint() {
+        let generator = GyroscopeGenerator::new(time, quat);
+        let a = 0;
+        let b = 10000;
+        let (ta, qa) = generator.rotation(a);
+        let (tb, qb) = generator.rotation(b);
+
+        let mut timestamps = vec![];
+        let mut angular_velocities = vec![];
+        for i in (a..=b).step_by(10) {
+            // NOTE b is inclusive
+            let (t, w) = generator.angular_velocity(i);
+            timestamps.push(t);
+            angular_velocities.push(w);
+        }
+        let dq = integrate_midpoint(&timestamps, &angular_velocities);
+        assert!(f64::abs(((qa * dq).inverse() * qb).angle()) < 1e-4);
     }
 }
