@@ -1,4 +1,6 @@
+use crate::integratable::Integratable;
 use crate::{identity, propagate};
+
 use core::ops::Mul;
 use nalgebra::geometry::{Quaternion, UnitQuaternion};
 use nalgebra::Vector3;
@@ -106,13 +108,6 @@ fn has_corresponding_imu_timestamp<T: std::cmp::PartialOrd + std::cmp::Ord>(
     imu_timestamps.binary_search(&query_timestamp).is_ok()
 }
 
-struct Gyro {
-    r_wb_i: UnitQuaternion<f64>,
-    r_wb_j: UnitQuaternion<f64>,
-    timestamps: Vec<f64>,
-    angular_velocities: Vec<Vector3<f64>>,
-}
-
 pub fn integrate_euler(
     timestamps: &[f64],
     angular_velocities: &[Vector3<f64>],
@@ -143,47 +138,34 @@ fn integrate_midpoint(
     q
 }
 
-impl Gyro {
+struct GyroscopeResidual {
+    r_wb_i: UnitQuaternion<f64>,
+    r_wb_j: UnitQuaternion<f64>,
+    integratable: Integratable,
+}
+
+impl GyroscopeResidual {
     fn new(
-        r_wb_i: &UnitQuaternion<f64>,
-        r_wb_j: &UnitQuaternion<f64>,
-        timestamps: Vec<f64>,
-        angular_velocities: Vec<Vector3<f64>>,
-    ) -> Gyro {
-        Gyro {
-            r_wb_i: *r_wb_i,
-            r_wb_j: *r_wb_j,
-            timestamps,
-            angular_velocities,
+        r_wb_i: UnitQuaternion<f64>,
+        r_wb_j: UnitQuaternion<f64>,
+        integratable: Integratable,
+    ) -> Self {
+        GyroscopeResidual {
+            r_wb_i,
+            r_wb_j,
+            integratable,
         }
     }
 
-    fn integrate(&self) -> UnitQuaternion<f64> {
-        let mut q = UnitQuaternion::identity();
-        for i in 0..self.timestamps.len() - 1 {
-            let dt = self.timestamps[i + 1] - self.timestamps[i + 0];
-            let omega = self.angular_velocities[i];
-            let dq = UnitQuaternion::from_scaled_axis(omega * dt);
-            q = q * dq;
-        }
-        q
+    fn residual(&self) -> Vector3<f64> {
+        let dr = self.integratable.integrate_euler();
+        let d = self.r_wb_j.inverse() * self.r_wb_i * dr;
+        d.scaled_axis()
     }
 
-    // fn residual(&self, bias: &Vector3<f64>) -> Vector3<f64> {
-    //     let mut q = self.r_wb_i.inverse() * self.r_wb_j;
-    //     for i in 0..self.angular_velocities.len() {
-    //         let w = self.angular_velocities[i];
-    //         let dt = self.timestamps[i + 1] - self.timestamps[i];
-    //         let dq = UnitQuaternion::from_scaled_axis((w - bias) * dt);
-    //         q = q * dq;
-    //     }
-    //     q.scaled_axis()
-    // }
-
-    // fn error(&self, bias: &Vector3<f64>) -> f64 {
-    //     let r = self.residual(bias);
-    //     r.norm_squared()
-    // }
+    fn error(&self) -> f64 {
+        self.residual().norm_squared()
+    }
 }
 
 fn jacobian() {}
@@ -216,16 +198,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let imu_timestamps_sec = imu_timestamps[index0..=index1]
-        .iter()
-        .map(nanosec_to_sec)
-        .collect::<Vec<f64>>();
-    let gyro = Gyro::new(
-        &rotations[index0],
-        &rotations[index1],
-        imu_timestamps_sec,
-        angular_velocities[index0..index1].to_vec(),
-    );
+    // let imu_timestamps_sec = imu_timestamps[index0..=index1]
+    //     .iter()
+    //     .map(nanosec_to_sec)
+    //     .collect::<Vec<f64>>();
+    // let gyro = GyroscopeResidual::new(
+    //     &rotations[index0],
+    //     &rotations[index1],
+    //     imu_timestamps_sec,
+    //     angular_velocities[index0..index1].to_vec(),
+    // );
     // let bias = Vector3::zeros();
     // let e = gyro.error(&bias);
     // println!("error = {}", e);
@@ -305,5 +287,37 @@ mod tests {
         }
         let dq = integrate_midpoint(&timestamps, &angular_velocities);
         assert!(f64::abs(((qa * dq).inverse() * qb).angle()) < 1e-4);
+    }
+
+    #[test]
+    fn test_gyro_residual() {
+        let generator = GyroscopeGenerator::new(time, quat);
+        let a = 0;
+        let m = 8000;
+        let b = 10000;
+        let (ta, qa) = generator.rotation(a);
+        let (tb, qb) = generator.rotation(b);
+
+        let mut integratable_ts = vec![];
+        let mut integratable_ws = vec![];
+        for i in a..=m {
+            let (t, w) = generator.angular_velocity(i);
+            integratable_ts.push(t);
+            integratable_ws.push(w);
+        }
+        let integratable =
+            Integratable::new_interpolated(&integratable_ts, &integratable_ws, time(a), time(m));
+        let gyro = GyroscopeResidual::new(qa, qb, integratable);
+
+        let mut residual_ts = vec![];
+        let mut residual_ws = vec![];
+        for i in m..=b {
+            let (t, w) = generator.angular_velocity(i);
+            residual_ts.push(t);
+            residual_ws.push(w);
+        }
+        let expected_q = integrate_euler(&residual_ts, &residual_ws).inverse();
+
+        assert!((gyro.residual() - expected_q.scaled_axis()).norm() < 1e-8);
     }
 }

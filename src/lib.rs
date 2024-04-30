@@ -1,8 +1,10 @@
 #![feature(stmt_expr_attributes)]
 
 mod generator;
+mod integratable;
 mod integration;
 mod interface;
+mod interpolation;
 
 use nalgebra::{ArrayStorage, Const, Matrix, SMatrix, Vector3};
 
