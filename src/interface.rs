@@ -13,6 +13,41 @@ fn binary_search(target: &VecDeque<f64>, query: f64) -> Result<usize, usize> {
     target.binary_search_by(|t| t.total_cmp(&query))
 }
 
+fn interpolate(t0: f64, t1: f64, t: f64, w0: &Vector3<f64>, w1: &Vector3<f64>) -> Vector3<f64> {
+    assert!(t1 != t0);
+    ((t1 - t) * w0 + (t - t0) * w1) / (t1 - t0)
+}
+
+struct Integratable {
+    ts: Vec<f64>,
+    ws: Vec<Vector3<f64>>,
+}
+
+fn concat<T: Copy>(i: T, mid: &[T], j: T) -> Vec<T> {
+    let mut array = vec![];
+    array.push(i);
+    for e in mid {
+        array.push(*e);
+    }
+    array.push(j);
+    array
+}
+
+impl Integratable {
+    fn new_interpolated(ts: &[f64], ws: &[Vector3<f64>], ti: f64, tj: f64) -> Self {
+        assert_eq!(ts.len(), ws.len());
+        let n = ws.len();
+        let wi = interpolate(ts[0], ts[1], ti, &ws[0], &ws[1]);
+        let wj = interpolate(ts[n - 2], ts[n - 1], tj, &ws[n - 2], &ws[n - 1]);
+        let ts_new = concat(ti, &ts[1..n - 1], tj);
+        let ws_new = concat(wi, &ws[1..n - 1], wj);
+        Integratable {
+            ts: ts_new,
+            ws: ws_new,
+        }
+    }
+}
+
 impl GyroInterface {
     fn new() -> Self {
         GyroInterface {
@@ -47,17 +82,17 @@ impl GyroInterface {
         }
 
         let n = self.gyroscope_timestamps.len();
-        let t0 = self.rotation_timestamps[0];
-        let t1 = self.rotation_timestamps[1];
+        let rt0 = self.rotation_timestamps[0];
+        let rt1 = self.rotation_timestamps[1];
 
-        if t0 < self.gyroscope_timestamps[0] {
+        if rt0 < self.gyroscope_timestamps[0] {
             return None;
         }
-        if t1 > self.gyroscope_timestamps[n - 1] {
+        if rt1 > self.gyroscope_timestamps[n - 1] {
             return None;
         }
 
-        match binary_search(&self.gyroscope_timestamps, t0) {
+        match binary_search(&self.gyroscope_timestamps, rt0) {
             Ok(index) => {
                 self.gyroscope_timestamps.drain(..index);
                 self.angular_velocities.drain(..index);
@@ -68,8 +103,8 @@ impl GyroInterface {
             }
         }
 
-        let t1 = self.rotation_timestamps[1];
-        match binary_search(&self.gyroscope_timestamps, t1) {
+        let rt1 = self.rotation_timestamps[1];
+        match binary_search(&self.gyroscope_timestamps, rt1) {
             Ok(index) => {
                 let ts = self
                     .gyroscope_timestamps
@@ -271,7 +306,7 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in [2, 4, 6, 8, 10, 12].iter() {
+        for i in [2, 4, 6, 8, 10, 12, 14].iter() {
             let (t, omega) = generator.angular_velocity(*i);
             interface.add_gyroscope(t, &omega);
         }
@@ -287,5 +322,28 @@ mod tests {
             Some((ts, ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
             None => assert!(false),
         }
+    }
+
+    #[test]
+    fn test_new_interpolated() {
+        let ts = [1.0, 1.1, 1.2, 1.3, 1.4];
+        let ws = [
+            Vector3::new(1.0, 0.0, 0.2),
+            Vector3::new(2.0, 1.0, 0.2),
+            Vector3::new(3.0, 1.0, 0.4),
+            Vector3::new(4.0, 1.0, 0.5),
+            Vector3::new(4.0, 1.5, 1.5),
+        ];
+        let integratable = Integratable::new_interpolated(&ts, &ws, 1.02, 1.36);
+        assert_eq!(integratable.ts.len(), 5);
+        assert_eq!(integratable.ws.len(), 5);
+
+        let wi = Vector3::new(1.2, 0.2, 0.2);
+        let wj = Vector3::new(4.0, 1.3, 1.1);
+        assert!((integratable.ws[0] - wi).norm() < 1e-8);
+        assert_eq!(integratable.ws[1], Vector3::new(2.0, 1.0, 0.2));
+        assert_eq!(integratable.ws[2], Vector3::new(3.0, 1.0, 0.4));
+        assert_eq!(integratable.ws[3], Vector3::new(4.0, 1.0, 0.5));
+        assert!((integratable.ws[4] - wj).norm() < 1e-8);
     }
 }

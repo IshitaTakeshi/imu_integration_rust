@@ -106,11 +106,6 @@ fn has_corresponding_imu_timestamp<T: std::cmp::PartialOrd + std::cmp::Ord>(
     imu_timestamps.binary_search(&query_timestamp).is_ok()
 }
 
-fn interpolate(t0: f64, t1: f64, t: f64, w0: &Vector3<f64>, w1: &Vector3<f64>) -> Vector3<f64> {
-    assert!(t1 != t0);
-    ((t1 - t) * w0 + (t - t0) * w1) / (t1 - t0)
-}
-
 fn check_timestamps(timestamps: &[f64], ti: f64, tj: f64) {
     let n = timestamps.len();
     assert!(n >= 3);
@@ -135,7 +130,7 @@ fn compute_timestamps(timestamps: &[f64], ti: f64, tj: f64) -> Vec<f64> {
 struct Gyro {
     r_wb_i: UnitQuaternion<f64>,
     r_wb_j: UnitQuaternion<f64>,
-    dts: Vec<f64>,
+    timestamps: Vec<f64>,
     angular_velocities: Vec<Vector3<f64>>,
 }
 
@@ -143,22 +138,26 @@ impl Gyro {
     fn new(
         r_wb_i: &UnitQuaternion<f64>,
         r_wb_j: &UnitQuaternion<f64>,
-        dts: Vec<f64>,
+        timestamps: Vec<f64>,
         angular_velocities: Vec<Vector3<f64>>,
     ) -> Gyro {
         Gyro {
             r_wb_i: *r_wb_i,
             r_wb_j: *r_wb_j,
-            dts,
+            timestamps,
             angular_velocities,
         }
     }
 
-    fn integrate(&self) {
-        for i in 0..self.dts.len() {
-            let dt = self.dts[i];
+    fn integrate(&self) -> UnitQuaternion<f64> {
+        let mut q = UnitQuaternion::identity();
+        for i in 0..self.timestamps.len() - 1 {
+            let dt = self.timestamps[i + 1] - self.timestamps[i + 0];
             let omega = self.angular_velocities[i];
+            let dq = UnitQuaternion::from_scaled_axis(omega * dt);
+            q = q * dq;
         }
+        q
     }
 
     // fn residual(&self, bias: &Vector3<f64>) -> Vector3<f64> {
@@ -254,22 +253,4 @@ mod tests {
             assert!(f64::abs(t - e) < 1e-16);
         }
     }
-
-    // #[test]
-    // fn test_residual_with_time_offset() {
-    //     let gyro = Gyro::new();
-
-    //     let q = quat(time(0));
-    //     let q = quat(time(100));
-
-    //     gyro.add_start_reference_pose();
-
-    //     for i in 0..100 {
-    //         let t = time(i);
-    //         let q = quat(t);
-    //         gyro.add_gyroscope(t, q);
-    //     }
-
-    //     gyro.add_end_reference_pose(tb, qb);
-    // }
 }
