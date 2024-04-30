@@ -138,8 +138,6 @@ fn integrate_midpoint(
     q
 }
 
-fn jacobian() {}
-
 fn nanosec_to_sec(nanosec: &u128) -> f64 {
     (*nanosec as f64) * 1e-9
 }
