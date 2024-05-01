@@ -83,8 +83,27 @@ fn left_jacobian(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
         + ((norm - f64::sin(norm)) / (norm * norm * norm)) * wedge * wedge
 }
 
+fn inv_left_jacobian(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
+    let epsilon = 1e-6;
+    let norm = rotvec.norm();
+
+    let identity3 = identity::<3>();
+    let wedge = wedge_so3(&rotvec);
+
+    if norm < epsilon {
+        return identity3 - 0.5 * wedge;
+    }
+
+    let k = 1. / (norm * norm) - (1. + f64::cos(norm)) / (2. * norm * f64::sin(norm));
+    identity3 - 0.5 * wedge + k * wedge * wedge
+}
+
 fn right_jacobian(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
     left_jacobian(&(-rotvec))
+}
+
+fn inv_right_jacobian(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
+    inv_left_jacobian(&(-rotvec))
 }
 
 fn exp_so3(rotvec: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
@@ -318,6 +337,42 @@ mod tests {
 
         assert!((j * nu - exp.fixed_view::<3, 1>(0, 3)).norm() < 1e-10);
         assert!((j * rho - exp.fixed_view::<3, 1>(0, 4)).norm() < 1e-10);
+    }
+
+    #[test]
+    fn test_inv_left_jacobian() {
+        let theta = Vector3::new(0.3, 0.1, 0.2);
+        let j = left_jacobian(&theta);
+        let inv_j = inv_left_jacobian(&theta);
+
+        assert!((j * inv_j - SMatrix::<f64, 3, 3>::identity()).norm() < 1e-12);
+    }
+
+    #[test]
+    fn test_inv_left_jacobian_small_phi() {
+        let theta = Vector3::new(1e-8, 1e-7, 2e-7);
+        let j = left_jacobian(&theta);
+        let inv_j = inv_left_jacobian(&theta);
+
+        assert!((j * inv_j - SMatrix::<f64, 3, 3>::identity()).norm() < 1e-12);
+    }
+
+    #[test]
+    fn test_inv_right_jacobian() {
+        let theta = Vector3::new(0.3, 0.1, 0.2);
+        let j = right_jacobian(&theta);
+        let inv_j = inv_right_jacobian(&theta);
+
+        assert!((j * inv_j - SMatrix::<f64, 3, 3>::identity()).norm() < 1e-12);
+    }
+
+    #[test]
+    fn test_inv_right_jacobian_small_phi() {
+        let theta = Vector3::new(1e-8, 1e-7, 2e-7);
+        let j = right_jacobian(&theta);
+        let inv_j = inv_right_jacobian(&theta);
+
+        assert!((j * inv_j - SMatrix::<f64, 3, 3>::identity()).norm() < 1e-12);
     }
 
     #[test]
