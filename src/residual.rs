@@ -22,14 +22,14 @@ impl GyroscopeResidual {
         }
     }
 
-    fn residual(&self) -> Vector3<f64> {
-        let dr = self.integratable.integrate_euler();
+    fn residual(&self, bias: &Vector3<f64>) -> Vector3<f64> {
+        let dr = self.integratable.integrate_euler(bias);
         let d = self.r_wb_j.inverse() * self.r_wb_i * dr;
         d.scaled_axis()
     }
 
-    fn error(&self) -> f64 {
-        self.residual().norm_squared()
+    fn error(&self, bias: &Vector3<f64>) -> f64 {
+        self.residual(bias).norm_squared()
     }
 }
 
@@ -104,9 +104,9 @@ mod tests {
             residual_ts.push(t);
             residual_ws.push(w);
         }
-        let expected_q = integrate_euler(&residual_ts, &residual_ws).inverse();
+        let expected_q = integrate_euler(&residual_ts, &residual_ws, &Vector3::zeros()).inverse();
 
-        assert!((gyro.residual() - expected_q.scaled_axis()).norm() < 1e-8);
+        assert!((gyro.residual(&Vector3::zeros()) - expected_q.scaled_axis()).norm() < 1e-8);
     }
 
     #[test]
@@ -138,8 +138,8 @@ mod tests {
 
         let jacobian = jacobian(&ts, &ws0, &qi, &qj);
 
-        let r1 = gyro1.residual();
-        let r0 = gyro0.residual();
+        let r1 = gyro1.residual(&Vector3::zeros());
+        let r0 = gyro0.residual(&Vector3::zeros());
         assert!((r1 - r0 + jacobian * dbias).norm() < 1e-4);
     }
 
@@ -167,7 +167,7 @@ mod tests {
         let jacobian = jacobian(&ts, &ws, &qi, &qj);
         let hessian = jacobian.transpose() * jacobian;
         let inv_hessian = hessian.try_inverse().unwrap();
-        let dbias = inv_hessian * jacobian.transpose() * gyro.residual();
+        let dbias = inv_hessian * jacobian.transpose() * gyro.residual(&Vector3::zeros());
         assert!((bias_true + dbias).norm() < bias_true.norm() * 1e-2);
     }
 }

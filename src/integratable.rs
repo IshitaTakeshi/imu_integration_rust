@@ -41,8 +41,8 @@ impl Integratable {
         }
     }
 
-    pub fn integrate_euler(&self) -> UnitQuaternion<f64> {
-        integration::integrate_euler(&self.ts, &self.ws)
+    pub fn integrate_euler(&self, bias: &Vector3<f64>) -> UnitQuaternion<f64> {
+        integration::integrate_euler(&self.ts, &self.ws, bias)
     }
 }
 
