@@ -160,25 +160,25 @@ mod tests {
         let (_tj, qj) = generator.rotation(j);
 
         let mut ts = vec![];
-        let mut ws_observed = vec![];
-        let mut ws_delta_affected = vec![];
+        let mut ws0 = vec![];
+        let mut ws1 = vec![];
         for k in i..=j {
             let (t, w) = generator.angular_velocity(k);
             ts.push(t);
-            ws_observed.push(w - bias);
-            ws_delta_affected.push(w - bias - dbias);
+            ws0.push(w - bias);
+            ws1.push(w - bias - dbias);
         }
 
-        let integratable = Integratable::new_interpolated(&ts, &ws_observed, time(i), time(j));
-        let gyro_observed = GyroscopeResidual::new(qi, qj, integratable);
+        let integratable = Integratable::new_interpolated(&ts, &ws0, time(i), time(j));
+        let gyro0 = GyroscopeResidual::new(qi, qj, integratable);
 
-        let integratable =
-            Integratable::new_interpolated(&ts, &ws_delta_affected, time(i), time(j));
-        let gyro_delta_affected = GyroscopeResidual::new(qi, qj, integratable);
-        let jacobian = jacobian(&ts, &ws_observed, &qi, &qj);
+        let integratable = Integratable::new_interpolated(&ts, &ws1, time(i), time(j));
+        let gyro1 = GyroscopeResidual::new(qi, qj, integratable);
 
-        let target = gyro_delta_affected.residual();
-        let estimation = gyro_observed.residual() - jacobian * dbias;
-        assert!((target - estimation).norm() < 1e-8);
+        let jacobian = jacobian(&ts, &ws0, &qi, &qj);
+
+        let r1 = gyro1.residual();
+        let r0 = gyro0.residual();
+        assert!((r1 - r0 + jacobian * dbias).norm() < 1e-8);
     }
 }
