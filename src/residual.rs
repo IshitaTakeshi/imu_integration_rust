@@ -1,7 +1,7 @@
 use crate::integratable::Integratable;
 use nalgebra::{Quaternion, SMatrix, UnitQuaternion, Vector3};
 
-use crate::{inv_right_jacobian, right_jacobian};
+use crate::inv_right_jacobian;
 
 struct GyroscopeResidual {
     r_wb_i: UnitQuaternion<f64>,
@@ -31,28 +31,12 @@ impl GyroscopeResidual {
     fn error(&self, bias: &Vector3<f64>) -> f64 {
         self.residual(bias).norm_squared()
     }
-}
 
-fn jacobian(
-    ts: &[f64],
-    ws: &[Vector3<f64>],
-    qi: &UnitQuaternion<f64>,
-    qj: &UnitQuaternion<f64>,
-    bias: &Vector3<f64>,
-) -> SMatrix<f64, 3, 3> {
-    let mut m = SMatrix::<f64, 3, 3>::zeros();
-    let mut predcessor = UnitQuaternion::identity();
-    for k in (0..ts.len() - 1).rev() {
-        let dt = ts[k + 1] - ts[k + 0];
-        let w = ws[k] - bias;
-        let theta = w * dt;
-        let r = predcessor.to_rotation_matrix();
-        m += r.transpose() * right_jacobian(&theta) * dt;
-        predcessor = UnitQuaternion::from_scaled_axis(theta) * predcessor;
+    fn jacobian(&self, bias: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
+        let (m, predecessor) = self.integratable.calc_m_and_predecessor(bias);
+        let xi = (self.r_wb_j.inverse() * self.r_wb_i * predecessor).scaled_axis();
+        inv_right_jacobian(&xi) * m
     }
-
-    let xi = (qj.inverse() * qi * predcessor).scaled_axis();
-    inv_right_jacobian(&xi) * m
 }
 
 #[cfg(test)]
@@ -135,7 +119,7 @@ mod tests {
         let integratable = Integratable::new_interpolated(&ts, &ws, ti, tj);
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
 
-        let jacobian = jacobian(&ts, &ws, &qi, &qj, &Vector3::zeros());
+        let jacobian = gyro.jacobian(&Vector3::zeros());
 
         let r0 = gyro.residual(&Vector3::zeros());
         let r1 = gyro.residual(&dbias);
@@ -168,7 +152,7 @@ mod tests {
 
         let mut bias_pred = Vector3::zeros();
         for _ in 0..5 {
-            let jacobian = jacobian(&ts, &ws, &qi, &qj, &bias_pred);
+            let jacobian = gyro.jacobian(&bias_pred);
             let hessian = jacobian.transpose() * jacobian;
             let inv_hessian = hessian.try_inverse().unwrap();
             let dbias = inv_hessian * jacobian.transpose() * gyro.residual(&bias_pred);

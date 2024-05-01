@@ -1,6 +1,7 @@
 use crate::integration;
 use crate::interpolation;
-use nalgebra::{UnitQuaternion, Vector3};
+use crate::right_jacobian;
+use nalgebra::{SMatrix, UnitQuaternion, Vector3};
 
 pub struct Integratable {
     ts: Vec<f64>,
@@ -43,6 +44,23 @@ impl Integratable {
 
     pub fn integrate_euler(&self, bias: &Vector3<f64>) -> UnitQuaternion<f64> {
         integration::integrate_euler(&self.ts, &self.ws, bias)
+    }
+
+    pub fn calc_m_and_predecessor(
+        &self,
+        bias: &Vector3<f64>,
+    ) -> (SMatrix<f64, 3, 3>, UnitQuaternion<f64>) {
+        let mut m = SMatrix::<f64, 3, 3>::zeros();
+        let mut predecessor = UnitQuaternion::identity();
+        for k in (0..self.ts.len() - 1).rev() {
+            let dt = self.ts[k + 1] - self.ts[k + 0];
+            let w = self.ws[k] - bias;
+            let theta = w * dt;
+            let r = predecessor.to_rotation_matrix();
+            m += r.transpose() * right_jacobian(&theta) * dt;
+            predecessor = UnitQuaternion::from_scaled_axis(theta) * predecessor;
+        }
+        (m, predecessor)
     }
 }
 
