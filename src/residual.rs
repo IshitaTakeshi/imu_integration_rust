@@ -120,8 +120,8 @@ mod tests {
 
         let i = 0;
         let j = 1000;
-        let (_ti, qi) = generator.rotation(i);
-        let (_tj, qj) = generator.rotation(j);
+        let (ti, qi) = generator.rotation(i);
+        let (tj, qj) = generator.rotation(j);
 
         let mut ts = vec![];
         let mut ws = vec![];
@@ -132,7 +132,7 @@ mod tests {
             ws.push(w - bias); // Assume that the observed angular velocities are already biased
         }
 
-        let integratable = Integratable::new_interpolated(&ts, &ws, time(i), time(j));
+        let integratable = Integratable::new_interpolated(&ts, &ws, ti, tj);
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
 
         let jacobian = jacobian(&ts, &ws, &qi, &qj, &Vector3::zeros());
@@ -149,8 +149,8 @@ mod tests {
 
         let i = 0;
         let j = 1000;
-        let (_ti, qi) = generator.rotation(i);
-        let (_tj, qj) = generator.rotation(j);
+        let (ti, qi) = generator.rotation(i);
+        let (tj, qj) = generator.rotation(j);
 
         let mut ts = vec![];
         let mut ws = vec![];
@@ -163,7 +163,7 @@ mod tests {
             ws.push(w - bias_true);
         }
 
-        let integratable = Integratable::new_interpolated(&ts, &ws, time(i), time(j));
+        let integratable = Integratable::new_interpolated(&ts, &ws, ti, tj);
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
 
         let mut bias_pred = Vector3::zeros();
