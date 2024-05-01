@@ -1,5 +1,7 @@
 use crate::integratable::Integratable;
-use nalgebra::{Quaternion, UnitQuaternion, Vector3};
+use nalgebra::{Quaternion, SMatrix, UnitQuaternion, Vector3};
+
+use crate::{inv_right_jacobian, right_jacobian};
 
 struct GyroscopeResidual {
     r_wb_i: UnitQuaternion<f64>,
@@ -31,14 +33,33 @@ impl GyroscopeResidual {
     }
 }
 
+fn jacobian(
+    ts: &[f64],
+    ws: &[Vector3<f64>],
+    qi: &UnitQuaternion<f64>,
+    qj: &UnitQuaternion<f64>,
+) -> SMatrix<f64, 3, 3> {
+    let mut m = SMatrix::<f64, 3, 3>::zeros();
+    let mut predcessor = UnitQuaternion::identity();
+    for k in (0..ts.len() - 1).rev() {
+        let dt = ts[k + 1] - ts[k + 0];
+        let w = ws[k];
+        let theta = w * dt;
+        let r = predcessor.to_rotation_matrix();
+        m += r.transpose() * right_jacobian(&theta) * dt;
+        predcessor = UnitQuaternion::from_scaled_axis(theta) * predcessor;
+    }
+
+    let xi = (qj.inverse() * qi * predcessor).scaled_axis();
+    inv_right_jacobian(&xi) * m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::generator::GyroscopeGenerator;
     use crate::integration::integrate_euler;
-    use crate::{inv_right_jacobian, right_jacobian};
     use core::f64::consts::PI;
-    use nalgebra::SMatrix;
 
     fn quat(t: f64) -> UnitQuaternion<f64> {
         let x = f64::sin(2. * PI * 1. * t);
@@ -151,20 +172,18 @@ mod tests {
         let integratable =
             Integratable::new_interpolated(&ts, &ws_delta_affected, time(i), time(j));
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
+        let jacobian = jacobian(&ts, &ws_observed, &qi, &qj);
 
-        let mut m = SMatrix::<f64, 3, 3>::zeros();
         let mut predcessor = UnitQuaternion::identity();
         for k in (0..ts.len() - 1).rev() {
             let dt = ts[k + 1] - ts[k + 0];
             let w = ws_observed[k];
             let theta = w * dt;
-            let r = predcessor.to_rotation_matrix();
-            m += r.transpose() * right_jacobian(&theta) * dt;
             predcessor = UnitQuaternion::from_scaled_axis(theta) * predcessor;
         }
 
         let xi = (qj.inverse() * qi * predcessor).scaled_axis();
-        let residual = xi - inv_right_jacobian(&xi) * m * dbias;
+        let residual = xi - jacobian * dbias;
         assert!((gyro.residual() - residual).norm() < 1e-8);
     }
 }
