@@ -123,8 +123,6 @@ mod tests {
         }
         let residual = q.scaled_axis();
 
-        // println!("gyro.residual() = {:?}", gyro.residual());
-        // println!("residual = {:?}", residual);
         assert!((gyro.residual() - residual).norm() < 1e-8);
     }
 
@@ -158,22 +156,6 @@ mod tests {
         let q2 = UnitQuaternion::from_scaled_axis(ws_observed[2] * dt);
         let q3 = UnitQuaternion::from_scaled_axis(ws_observed[3] * dt);
 
-        let q =
-            q0 * UnitQuaternion::from_scaled_axis(
-                -right_jacobian(&(ws_observed[0] * dt)) * dbias * dt,
-            ) * q1
-                * UnitQuaternion::from_scaled_axis(
-                    -right_jacobian(&(ws_observed[1] * dt)) * dbias * dt,
-                )
-                * q2
-                * UnitQuaternion::from_scaled_axis(
-                    -right_jacobian(&(ws_observed[2] * dt)) * dbias * dt,
-                )
-                * q3
-                * UnitQuaternion::from_scaled_axis(
-                    -right_jacobian(&(ws_observed[3] * dt)) * dbias * dt,
-                );
-
         let expected = UnitQuaternion::from_scaled_axis(ws_delta_affected[0] * dt)
             * UnitQuaternion::from_scaled_axis(ws_delta_affected[1] * dt)
             * UnitQuaternion::from_scaled_axis(ws_delta_affected[2] * dt)
@@ -187,40 +169,26 @@ mod tests {
                 q3.inverse()
                     * q2.inverse()
                     * q1.inverse()
-                    * (-right_jacobian(&(ws_observed[0] * dt)) * dbias * dt),
-            )
-            * UnitQuaternion::from_scaled_axis(
-                q3.inverse()
-                    * q2.inverse()
-                    * (-right_jacobian(&(ws_observed[1] * dt)) * dbias * dt),
-            )
-            * UnitQuaternion::from_scaled_axis(
-                q3.inverse() * (-right_jacobian(&(ws_observed[2] * dt)) * dbias * dt),
-            )
-            * UnitQuaternion::from_scaled_axis(
-                -(right_jacobian(&(ws_observed[3] * dt)) * dbias * dt),
+                    * (-right_jacobian(&(ws_observed[0] * dt)) * dbias * dt)
+                    + q3.inverse()
+                        * q2.inverse()
+                        * (-right_jacobian(&(ws_observed[1] * dt)) * dbias * dt)
+                    + q3.inverse() * (-right_jacobian(&(ws_observed[2] * dt)) * dbias * dt)
+                    - (right_jacobian(&(ws_observed[3] * dt)) * dbias * dt),
             );
-        let mut q = UnitQuaternion::identity();
+        let mut dr = Vector3::zeros();
         let mut predcessor = UnitQuaternion::identity();
         for k in (0..ts.len() - 1).rev() {
             let dt = ts[k + 1] - ts[k + 0];
             let w = ws_observed[k];
             let theta = w * dt;
             let d = -right_jacobian(&theta) * dbias * dt;
-            let dq = UnitQuaternion::from_scaled_axis(predcessor.inverse() * d);
+            dr += predcessor.inverse() * d;
             predcessor = UnitQuaternion::from_scaled_axis(theta) * predcessor;
-            q = dq * q;
-            println!("k = {}", k);
         }
-        q = predcessor * q;
+        let mut q = predcessor * UnitQuaternion::from_scaled_axis(dr);
         let residual = q.scaled_axis();
 
-        println!("expected.scaled_axis() = {:?}", expected.scaled_axis());
-        println!("q.scaled_axis() = {:?}", residual);
-        println!(
-            "integratable.integrate_euler().scaled_axis() = {:?}",
-            integratable.integrate_euler().scaled_axis()
-        );
         assert!((expected.scaled_axis() - residual).norm() < 1e-8);
         assert!((integratable.integrate_euler().scaled_axis() - residual).norm() < 1e-8);
 
