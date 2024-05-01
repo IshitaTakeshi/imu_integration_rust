@@ -151,31 +151,12 @@ mod tests {
             Integratable::new_interpolated(&ts, &ws_delta_affected, time(i), time(j));
 
         let dt = DELTA_T;
-        let q0 = UnitQuaternion::from_scaled_axis(ws_observed[0] * dt);
-        let q1 = UnitQuaternion::from_scaled_axis(ws_observed[1] * dt);
-        let q2 = UnitQuaternion::from_scaled_axis(ws_observed[2] * dt);
-        let q3 = UnitQuaternion::from_scaled_axis(ws_observed[3] * dt);
 
         let expected = UnitQuaternion::from_scaled_axis(ws_delta_affected[0] * dt)
             * UnitQuaternion::from_scaled_axis(ws_delta_affected[1] * dt)
             * UnitQuaternion::from_scaled_axis(ws_delta_affected[2] * dt)
             * UnitQuaternion::from_scaled_axis(ws_delta_affected[3] * dt);
 
-        let q = q0
-            * q1
-            * q2
-            * q3
-            * UnitQuaternion::from_scaled_axis(
-                q3.inverse()
-                    * q2.inverse()
-                    * q1.inverse()
-                    * (-right_jacobian(&(ws_observed[0] * dt)) * dbias * dt)
-                    + q3.inverse()
-                        * q2.inverse()
-                        * (-right_jacobian(&(ws_observed[1] * dt)) * dbias * dt)
-                    + q3.inverse() * (-right_jacobian(&(ws_observed[2] * dt)) * dbias * dt)
-                    - (right_jacobian(&(ws_observed[3] * dt)) * dbias * dt),
-            );
         let mut dr = Vector3::zeros();
         let mut predcessor = UnitQuaternion::identity();
         for k in (0..ts.len() - 1).rev() {
