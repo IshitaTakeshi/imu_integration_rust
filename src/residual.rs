@@ -38,12 +38,13 @@ fn jacobian(
     ws: &[Vector3<f64>],
     qi: &UnitQuaternion<f64>,
     qj: &UnitQuaternion<f64>,
+    bias: &Vector3<f64>,
 ) -> SMatrix<f64, 3, 3> {
     let mut m = SMatrix::<f64, 3, 3>::zeros();
     let mut predcessor = UnitQuaternion::identity();
     for k in (0..ts.len() - 1).rev() {
         let dt = ts[k + 1] - ts[k + 0];
-        let w = ws[k];
+        let w = ws[k] - bias;
         let theta = w * dt;
         let r = predcessor.to_rotation_matrix();
         m += r.transpose() * right_jacobian(&theta) * dt;
@@ -88,6 +89,7 @@ mod tests {
 
         let mut integratable_ts = vec![];
         let mut integratable_ws = vec![];
+        // NOTE m is inclusive
         for i in a..=m {
             let (t, w) = generator.angular_velocity(i);
             integratable_ts.push(t);
@@ -99,6 +101,7 @@ mod tests {
 
         let mut residual_ts = vec![];
         let mut residual_ws = vec![];
+        // NOTE b is inclusive
         for i in m..=b {
             let (t, w) = generator.angular_velocity(i);
             residual_ts.push(t);
@@ -121,25 +124,21 @@ mod tests {
         let (_tj, qj) = generator.rotation(j);
 
         let mut ts = vec![];
-        let mut ws0 = vec![];
-        let mut ws1 = vec![];
+        let mut ws = vec![];
+        // NOTE j is inclusive
         for k in i..=j {
             let (t, w) = generator.angular_velocity(k);
             ts.push(t);
-            ws0.push(w - bias);
-            ws1.push(w - (bias + dbias));
+            ws.push(w - bias); // Assume that the observed angular velocities are already biased
         }
 
-        let integratable = Integratable::new_interpolated(&ts, &ws0, time(i), time(j));
-        let gyro0 = GyroscopeResidual::new(qi, qj, integratable);
+        let integratable = Integratable::new_interpolated(&ts, &ws, time(i), time(j));
+        let gyro = GyroscopeResidual::new(qi, qj, integratable);
 
-        let integratable = Integratable::new_interpolated(&ts, &ws1, time(i), time(j));
-        let gyro1 = GyroscopeResidual::new(qi, qj, integratable);
+        let jacobian = jacobian(&ts, &ws, &qi, &qj, &Vector3::zeros());
 
-        let jacobian = jacobian(&ts, &ws0, &qi, &qj);
-
-        let r1 = gyro1.residual(&Vector3::zeros());
-        let r0 = gyro0.residual(&Vector3::zeros());
+        let r0 = gyro.residual(&Vector3::zeros());
+        let r1 = gyro.residual(&dbias);
         assert!((r1 - r0 + jacobian * dbias).norm() < 1e-4);
     }
 
@@ -155,8 +154,11 @@ mod tests {
 
         let mut ts = vec![];
         let mut ws = vec![];
+        // NOTE j is inclusive
         for k in i..=j {
             let (t, w) = generator.angular_velocity(k);
+            // Assume that the observed angular velocities are already biased and
+            // we want to estimate the bias from the observed data.
             ts.push(t);
             ws.push(w - bias_true);
         }
@@ -164,10 +166,14 @@ mod tests {
         let integratable = Integratable::new_interpolated(&ts, &ws, time(i), time(j));
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
 
-        let jacobian = jacobian(&ts, &ws, &qi, &qj);
-        let hessian = jacobian.transpose() * jacobian;
-        let inv_hessian = hessian.try_inverse().unwrap();
-        let dbias = inv_hessian * jacobian.transpose() * gyro.residual(&Vector3::zeros());
-        assert!((bias_true + dbias).norm() < bias_true.norm() * 1e-2);
+        let mut bias_pred = Vector3::zeros();
+        for _ in 0..5 {
+            let jacobian = jacobian(&ts, &ws, &qi, &qj, &bias_pred);
+            let hessian = jacobian.transpose() * jacobian;
+            let inv_hessian = hessian.try_inverse().unwrap();
+            let dbias = inv_hessian * jacobian.transpose() * gyro.residual(&bias_pred);
+            bias_pred = bias_pred + dbias;
+        }
+        assert!((bias_true + bias_pred).norm() < 1e-13);
     }
 }
