@@ -127,7 +127,7 @@ mod tests {
             let (t, w) = generator.angular_velocity(k);
             ts.push(t);
             ws0.push(w - bias);
-            ws1.push(w - bias - dbias);
+            ws1.push(w - (bias + dbias));
         }
 
         let integratable = Integratable::new_interpolated(&ts, &ws0, time(i), time(j));
@@ -141,5 +141,34 @@ mod tests {
         let r1 = gyro1.residual();
         let r0 = gyro0.residual();
         assert!((r1 - r0 + jacobian * dbias).norm() < 1e-4);
+    }
+
+    #[test]
+    fn test_gyro_error_minimization() {
+        let generator = GyroscopeGenerator::new(time, quat);
+        let bias_true = Vector3::new(0.15, -0.18, 0.24);
+
+        let i = 0;
+        let j = 1000;
+        let (_ti, qi) = generator.rotation(i);
+        let (_tj, qj) = generator.rotation(j);
+
+        let mut ts = vec![];
+        let mut ws = vec![];
+        for k in i..=j {
+            let (t, w) = generator.angular_velocity(k);
+            ts.push(t);
+            ws.push(w - bias_true);
+        }
+
+        let integratable = Integratable::new_interpolated(&ts, &ws, time(i), time(j));
+        let gyro = GyroscopeResidual::new(qi, qj, integratable);
+        let error0 = gyro.error();
+
+        let jacobian = jacobian(&ts, &ws, &qi, &qj);
+        let hessian = jacobian.transpose() * jacobian;
+        let inv_hessian = hessian.try_inverse().unwrap();
+        let dbias = inv_hessian * jacobian.transpose() * gyro.residual();
+        assert!((bias_true + dbias).norm() < bias_true.norm() * 1e-2);
     }
 }
