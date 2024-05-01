@@ -138,19 +138,29 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in 0..10 {
-            let (t, omega) = generator.angular_velocity(i);
-            interface.add_gyroscope(t, &omega);
-        }
+        let (t, omega) = generator.angular_velocity(4);
+        interface.add_gyroscope(t, &omega);
 
-        let (ta, qa) = generator.rotation(3);
+        let (ta, qa) = generator.rotation(4);
         interface.add_reference_pose(ta, &qa);
+
+        let (t, omega) = generator.angular_velocity(5);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(7);
+        interface.add_gyroscope(t, &omega);
 
         let (tb, qb) = generator.rotation(7);
         interface.add_reference_pose(tb, &qb);
 
+        let (t, omega) = generator.angular_velocity(8);
+        interface.add_gyroscope(t, &omega);
+
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.03, 0.04, 0.05, 0.06, 0.07]),
+            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.05, 0.06, 0.07]),
             None => assert!(false),
         }
     }
@@ -161,16 +171,26 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in 5..10 {
-            let (t, omega) = generator.angular_velocity(i);
-            interface.add_gyroscope(t, &omega);
-        }
-
         let (ta, qa) = generator.rotation(4);
         interface.add_reference_pose(ta, &qa);
 
+        let (t, omega) = generator.angular_velocity(5);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(7);
+        interface.add_gyroscope(t, &omega);
+
         let (tb, qb) = generator.rotation(7);
         interface.add_reference_pose(tb, &qb);
+
+        let (t, omega) = generator.angular_velocity(8);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(9);
+        interface.add_gyroscope(t, &omega);
 
         assert_eq!(interface.get(), None);
     }
@@ -181,15 +201,22 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in 0..10 {
-            let (t, omega) = generator.angular_velocity(i);
-            interface.add_gyroscope(t, &omega);
-        }
+        let (t, omega) = generator.angular_velocity(3);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(4);
+        interface.add_gyroscope(t, &omega);
 
         let (ta, qa) = generator.rotation(4);
         interface.add_reference_pose(ta, &qa);
 
-        let (tb, qb) = generator.rotation(10);
+        let (t, omega) = generator.angular_velocity(5);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (tb, qb) = generator.rotation(7);
         interface.add_reference_pose(tb, &qb);
 
         assert_eq!(interface.get(), None);
@@ -201,16 +228,26 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in 5..10 {
-            let (t, omega) = generator.angular_velocity(i);
-            interface.add_gyroscope(t, &omega);
-        }
+        let (t, omega) = generator.angular_velocity(5);
+        interface.add_gyroscope(t, &omega);
 
         let (ta, qa) = generator.rotation(5);
         interface.add_reference_pose(ta, &qa);
 
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(7);
+        interface.add_gyroscope(t, &omega);
+
         let (tb, qb) = generator.rotation(7);
         interface.add_reference_pose(tb, &qb);
+
+        let (t, omega) = generator.angular_velocity(8);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(9);
+        interface.add_gyroscope(t, &omega);
 
         match interface.get() {
             Some((ts, _ws)) => assert_eq!(ts, [0.05, 0.06, 0.07]),
@@ -224,16 +261,29 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in [2, 4, 6, 8, 10, 12].iter() {
-            let (t, omega) = generator.angular_velocity(*i);
-            interface.add_gyroscope(t, &omega);
-        }
+        let (t, omega) = generator.angular_velocity(2);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(4);
+        interface.add_gyroscope(t, &omega);
 
         let (ta, qa) = generator.rotation(5);
         interface.add_reference_pose(ta, &qa);
 
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(8);
+        interface.add_gyroscope(t, &omega);
+
         let (tb, qb) = generator.rotation(9);
         interface.add_reference_pose(tb, &qb);
+
+        let (t, omega) = generator.angular_velocity(10);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(12);
+        interface.add_gyroscope(t, &omega);
 
         match interface.get() {
             Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
@@ -247,16 +297,29 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in [2, 4, 6, 8, 10, 12].iter() {
-            let (t, omega) = generator.angular_velocity(*i);
-            interface.add_gyroscope(t, &omega);
-        }
+        let (t, omega) = generator.angular_velocity(2);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(4);
+        interface.add_gyroscope(t, &omega);
 
         let (ta, qa) = generator.rotation(5);
         interface.add_reference_pose(ta, &qa);
 
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(8);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(10);
+        interface.add_gyroscope(t, &omega);
+
         let (tb, qb) = generator.rotation(10);
         interface.add_reference_pose(tb, &qb);
+
+        let (t, omega) = generator.angular_velocity(12);
+        interface.add_gyroscope(t, &omega);
 
         // Include 0.04 to generate the interpolated angular velocity for 0.05
         match interface.get() {
@@ -271,16 +334,29 @@ mod tests {
 
         let generator = GyroscopeGenerator::new(time, quat);
 
-        for i in [2, 4, 6, 8, 10, 12, 14].iter() {
-            let (t, omega) = generator.angular_velocity(*i);
-            interface.add_gyroscope(t, &omega);
-        }
+        let (t, omega) = generator.angular_velocity(2);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(4);
+        interface.add_gyroscope(t, &omega);
 
         let (ta, qa) = generator.rotation(4);
         interface.add_reference_pose(ta, &qa);
 
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(8);
+        interface.add_gyroscope(t, &omega);
+
         let (tb, qb) = generator.rotation(9);
         interface.add_reference_pose(tb, &qb);
+
+        let (t, omega) = generator.angular_velocity(10);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(12);
+        interface.add_gyroscope(t, &omega);
 
         // Include 0.10 to generate the interpolated angular velocity for 0.09
         match interface.get() {
