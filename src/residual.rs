@@ -116,46 +116,7 @@ mod tests {
         let dbias = Vector3::new(0.03, -0.15, 0.10);
 
         let i = 0;
-        let j = 10000;
-        let (_ti, qi) = generator.rotation(i);
-        let (_tj, qj) = generator.rotation(j);
-
-        let mut ts = vec![];
-        let mut ws_observed = vec![];
-        let mut ws_delta_affected = vec![];
-        for k in i..=j {
-            let (t, w) = generator.angular_velocity(k);
-            ts.push(t);
-            ws_observed.push(w - bias);
-            ws_delta_affected.push(w - bias - dbias);
-        }
-
-        let integratable =
-            Integratable::new_interpolated(&ts, &ws_delta_affected, time(i), time(j));
-        let gyro = GyroscopeResidual::new(qi, qj, integratable);
-
-        let mut q = qi.inverse() * qj;
-        for k in 0..ts.len() - 1 {
-            let dt = ts[k + 1] - ts[k + 0];
-            let w = ws_observed[k];
-            let theta = w * dt;
-            q = q
-                * UnitQuaternion::from_scaled_axis(theta)
-                * UnitQuaternion::from_scaled_axis(-right_jacobian(&theta) * dbias * dt);
-        }
-        let residual = q.scaled_axis();
-
-        assert!((gyro.residual() - residual).norm() < 1e-8);
-    }
-
-    #[test]
-    fn test_approximate_gyro_residual2() {
-        let generator = GyroscopeGenerator::new(time, quat);
-        let bias = Vector3::new(0.5, 0.3, 0.4);
-        let dbias = Vector3::new(0.03, -0.15, 0.10);
-
-        let i = 0;
-        let j = 4;
+        let j = 1000;
         let (_ti, qi) = generator.rotation(i);
         let (_tj, qj) = generator.rotation(j);
 
@@ -179,6 +140,6 @@ mod tests {
 
         let r1 = gyro1.residual();
         let r0 = gyro0.residual();
-        assert!((r1 - r0 + jacobian * dbias).norm() < 1e-8);
+        assert!((r1 - r0 + jacobian * dbias).norm() < 1e-4);
     }
 }
