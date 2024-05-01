@@ -174,14 +174,7 @@ mod tests {
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
         let jacobian = jacobian(&ts, &ws_observed, &qi, &qj);
 
-        let mut predcessor = UnitQuaternion::identity();
-        for k in (0..ts.len() - 1).rev() {
-            let dt = ts[k + 1] - ts[k + 0];
-            let w = ws_observed[k];
-            let theta = w * dt;
-            predcessor = UnitQuaternion::from_scaled_axis(theta) * predcessor;
-        }
-
+        let predcessor = integrate_euler(&ts, &ws_observed);
         let xi = (qj.inverse() * qi * predcessor).scaled_axis();
         let residual = xi - jacobian * dbias;
         assert!((gyro.residual() - residual).norm() < 1e-8);
