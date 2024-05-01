@@ -1,7 +1,6 @@
 #![feature(stmt_expr_attributes)]
 
 mod generator;
-mod integratable;
 mod integration;
 mod interface;
 mod interpolation;
