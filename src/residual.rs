@@ -163,7 +163,6 @@ mod tests {
 
         let integratable = Integratable::new_interpolated(&ts, &ws, time(i), time(j));
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
-        let error0 = gyro.error();
 
         let jacobian = jacobian(&ts, &ws, &qi, &qj);
         let hessian = jacobian.transpose() * jacobian;

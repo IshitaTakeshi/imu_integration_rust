@@ -1,10 +1,6 @@
-use crate::integratable::Integratable;
-use crate::{identity, propagate};
-
-use core::ops::Mul;
 use nalgebra::geometry::{Quaternion, UnitQuaternion};
 use nalgebra::Vector3;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{error::Error, io, process};
 
 #[derive(Debug, Deserialize)]
