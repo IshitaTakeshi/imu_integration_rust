@@ -1,4 +1,3 @@
-use crate::generator::GyroscopeGenerator;
 use nalgebra::{UnitQuaternion, Vector3};
 use std::collections::VecDeque;
 
@@ -103,6 +102,7 @@ impl GyroInterface {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::generator::GyroscopeGenerator;
     use nalgebra::Quaternion;
 
     const PI: f64 = std::f64::consts::PI;

@@ -1,7 +1,7 @@
 use crate::integration;
 use crate::interpolation;
 use crate::right_jacobian;
-use nalgebra::{Quaternion, SMatrix, UnitQuaternion, Vector3};
+use nalgebra::{SMatrix, UnitQuaternion, Vector3};
 
 use crate::inv_right_jacobian;
 
@@ -108,6 +108,7 @@ mod tests {
     use crate::generator::GyroscopeGenerator;
     use crate::integration::integrate_euler;
     use core::f64::consts::PI;
+    use nalgebra::Quaternion;
 
     #[test]
     fn test_new_interpolated() {

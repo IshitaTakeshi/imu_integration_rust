@@ -196,10 +196,6 @@ pub fn propagate(
     gamma * phi(transform, dt) * upsilon
 }
 
-fn main() {
-    println!("Hello, world!");
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
