@@ -36,8 +36,9 @@ mod tests {
     use super::*;
     use crate::generator::GyroscopeGenerator;
     use crate::integration::integrate_euler;
-    use crate::right_jacobian;
+    use crate::{inv_right_jacobian, right_jacobian};
     use core::f64::consts::PI;
+    use nalgebra::SMatrix;
 
     fn quat(t: f64) -> UnitQuaternion<f64> {
         let x = f64::sin(2. * PI * 1. * t);
@@ -149,32 +150,21 @@ mod tests {
 
         let integratable =
             Integratable::new_interpolated(&ts, &ws_delta_affected, time(i), time(j));
+        let gyro = GyroscopeResidual::new(qi, qj, integratable);
 
-        let dt = DELTA_T;
-
-        let expected = UnitQuaternion::from_scaled_axis(ws_delta_affected[0] * dt)
-            * UnitQuaternion::from_scaled_axis(ws_delta_affected[1] * dt)
-            * UnitQuaternion::from_scaled_axis(ws_delta_affected[2] * dt)
-            * UnitQuaternion::from_scaled_axis(ws_delta_affected[3] * dt);
-
-        let mut dr = Vector3::zeros();
+        let mut m = SMatrix::<f64, 3, 3>::zeros();
         let mut predcessor = UnitQuaternion::identity();
         for k in (0..ts.len() - 1).rev() {
             let dt = ts[k + 1] - ts[k + 0];
             let w = ws_observed[k];
             let theta = w * dt;
-            let d = -right_jacobian(&theta) * dbias * dt;
-            dr += predcessor.inverse() * d;
+            let r = predcessor.to_rotation_matrix();
+            m += r.transpose() * right_jacobian(&theta) * dt;
             predcessor = UnitQuaternion::from_scaled_axis(theta) * predcessor;
         }
-        let mut q = predcessor * UnitQuaternion::from_scaled_axis(dr);
-        let residual = q.scaled_axis();
 
-        assert!((expected.scaled_axis() - residual).norm() < 1e-8);
-        assert!((integratable.integrate_euler().scaled_axis() - residual).norm() < 1e-8);
-
-        q = qj.inverse() * qi * q;
-        let gyro = GyroscopeResidual::new(qi, qj, integratable);
-        assert!((gyro.residual() - q.scaled_axis()).norm() < 1e-8);
+        let xi = (qj.inverse() * qi * predcessor).scaled_axis();
+        let residual = xi - inv_right_jacobian(&xi) * m * dbias;
+        assert!((gyro.residual() - residual).norm() < 1e-8);
     }
 }
