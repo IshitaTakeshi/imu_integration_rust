@@ -169,14 +169,16 @@ mod tests {
             ws_delta_affected.push(w - bias - dbias);
         }
 
+        let integratable = Integratable::new_interpolated(&ts, &ws_observed, time(i), time(j));
+        let gyro_observed = GyroscopeResidual::new(qi, qj, integratable);
+
         let integratable =
             Integratable::new_interpolated(&ts, &ws_delta_affected, time(i), time(j));
-        let gyro = GyroscopeResidual::new(qi, qj, integratable);
+        let gyro_delta_affected = GyroscopeResidual::new(qi, qj, integratable);
         let jacobian = jacobian(&ts, &ws_observed, &qi, &qj);
 
-        let predcessor = integrate_euler(&ts, &ws_observed);
-        let xi = (qj.inverse() * qi * predcessor).scaled_axis();
-        let residual = xi - jacobian * dbias;
-        assert!((gyro.residual() - residual).norm() < 1e-8);
+        let target = gyro_delta_affected.residual();
+        let estimation = gyro_observed.residual() - jacobian * dbias;
+        assert!((target - estimation).norm() < 1e-8);
     }
 }
