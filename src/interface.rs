@@ -40,7 +40,7 @@ impl GyroInterface {
         self.angular_velocities.push_back(*w);
     }
 
-    fn get(&mut self) -> Option<(Vec<f64>, Vec<Vector3<f64>>)> {
+    fn pop(&mut self) -> Option<(Vec<f64>, Vec<Vector3<f64>>)> {
         if self.gyroscope_timestamps.len() < 2 {
             return None;
         }
@@ -50,9 +50,6 @@ impl GyroInterface {
         let rt1 = self.rotation_timestamps[1];
         self.rotations.pop_front();
         self.rotation_timestamps.pop_front();
-
-        println!("rt0                  = {}", rt0);
-        println!("rt1                  = {}", rt1);
 
         if rt0 < self.gyroscope_timestamps[0] {
             return None;
@@ -136,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_without_time_offset() {
+    fn test_pop_without_time_offset() {
         let mut interface = GyroInterface::new();
 
         let generator = GyroscopeGenerator::new(time, quat);
@@ -162,14 +159,14 @@ mod tests {
         let (t, omega) = generator.angular_velocity(8);
         interface.add_gyroscope(t, &omega);
 
-        match interface.get() {
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [4., 5., 6., 7.]),
             None => assert!(false),
         }
     }
 
     #[test]
-    fn test_get_start_reference_time_too_early() {
+    fn test_pop_start_reference_time_too_early() {
         let mut interface = GyroInterface::new();
 
         let generator = GyroscopeGenerator::new(time, quat);
@@ -201,15 +198,15 @@ mod tests {
         let (t, omega) = generator.angular_velocity(11);
         interface.add_gyroscope(t, &omega);
 
-        assert_eq!(interface.get(), None);
-        match interface.get() {
+        assert_eq!(interface.pop(), None);
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [7., 8., 9., 11.]),
             None => assert!(false),
         }
     }
 
     #[test]
-    fn test_get_end_reference_time_too_late() {
+    fn test_pop_end_reference_time_too_late() {
         let mut interface = GyroInterface::new();
 
         let generator = GyroscopeGenerator::new(time, quat);
@@ -232,11 +229,11 @@ mod tests {
         let (tb, qb) = generator.rotation(7);
         interface.add_reference_pose(tb, &qb);
 
-        assert_eq!(interface.get(), None);
+        assert_eq!(interface.pop(), None);
     }
 
     #[test]
-    fn test_get_start_timestamp_matches() {
+    fn test_pop_start_timestamp_matches() {
         let mut interface = GyroInterface::new();
 
         let generator = GyroscopeGenerator::new(time, quat);
@@ -262,14 +259,14 @@ mod tests {
         let (t, omega) = generator.angular_velocity(9);
         interface.add_gyroscope(t, &omega);
 
-        match interface.get() {
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [5., 6., 7.]),
             None => assert!(false),
         }
     }
 
     #[test]
-    fn test_get_with_both_time_offsets() {
+    fn test_pop_with_both_time_offsets() {
         let mut interface = GyroInterface::new();
 
         let generator = GyroscopeGenerator::new(time, quat);
@@ -298,14 +295,14 @@ mod tests {
         let (t, omega) = generator.angular_velocity(12);
         interface.add_gyroscope(t, &omega);
 
-        match interface.get() {
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
     }
 
     #[test]
-    fn test_get_only_start_time_offset() {
+    fn test_pop_only_start_time_offset() {
         let mut interface = GyroInterface::new();
 
         let generator = GyroscopeGenerator::new(time, quat);
@@ -335,14 +332,14 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         // Include 4 to generate the interpolated angular velocity for 5
-        match interface.get() {
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
     }
 
     #[test]
-    fn test_get_only_end_time_offset() {
+    fn test_pop_only_end_time_offset() {
         let mut interface = GyroInterface::new();
 
         let generator = GyroscopeGenerator::new(time, quat);
@@ -372,7 +369,7 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         // Include 10 to generate the interpolated angular velocity for 9
-        match interface.get() {
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
@@ -412,12 +409,12 @@ mod tests {
         interface.add_reference_pose(tb, &qb);
 
         // Include 10 to generate the interpolated angular velocity for 9
-        match interface.get() {
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
 
-        match interface.get() {
+        match interface.pop() {
             Some((ts, _ws)) => assert_eq!(ts, [8., 10., 12.]),
             None => assert!(false),
         }
