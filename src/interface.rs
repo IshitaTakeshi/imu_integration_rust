@@ -49,6 +49,9 @@ impl GyroInterface {
         let rt0 = self.rotation_timestamps[0];
         let rt1 = self.rotation_timestamps[1];
 
+        println!("rt0                  = {}", rt0);
+        println!("rt1                  = {}", rt1);
+
         if rt0 < self.gyroscope_timestamps[0] {
             return None;
         }
@@ -67,7 +70,8 @@ impl GyroInterface {
             }
         }
 
-        let rt1 = self.rotation_timestamps[1];
+        self.rotations.pop_front();
+        self.rotation_timestamps.pop_front();
         match binary_search(&self.gyroscope_timestamps, rt1) {
             Ok(index) => {
                 let ts = self
@@ -83,16 +87,16 @@ impl GyroInterface {
             Err(index) => {
                 let mut ts = self
                     .gyroscope_timestamps
-                    .drain(..index)
+                    .drain(..index - 1)
                     .collect::<Vec<f64>>();
                 let mut ws = self
                     .angular_velocities
-                    .drain(..index)
+                    .drain(..index - 1)
                     .collect::<Vec<Vector3<f64>>>();
-                let t = self.gyroscope_timestamps[0];
-                let w = self.angular_velocities[0];
-                ts.push(t);
-                ws.push(w);
+                let t01 = self.gyroscope_timestamps.range(0..2);
+                let w01 = self.angular_velocities.range(0..2);
+                ts.extend(t01);
+                ws.extend(w01);
                 return Some((ts, ws));
             }
         }
@@ -361,6 +365,51 @@ mod tests {
         // Include 0.10 to generate the interpolated angular velocity for 0.09
         match interface.get() {
             Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_multiple_pop() {
+        let mut interface = GyroInterface::new();
+
+        let generator = GyroscopeGenerator::new(time, quat);
+
+        let (t, omega) = generator.angular_velocity(2);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(4);
+        interface.add_gyroscope(t, &omega);
+
+        let (ta, qa) = generator.rotation(4);
+        interface.add_reference_pose(ta, &qa);
+
+        let (t, omega) = generator.angular_velocity(6);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(8);
+        interface.add_gyroscope(t, &omega);
+
+        let (tb, qb) = generator.rotation(9);
+        interface.add_reference_pose(tb, &qb);
+
+        let (t, omega) = generator.angular_velocity(10);
+        interface.add_gyroscope(t, &omega);
+
+        let (t, omega) = generator.angular_velocity(12);
+        interface.add_gyroscope(t, &omega);
+
+        let (tb, qb) = generator.rotation(12);
+        interface.add_reference_pose(tb, &qb);
+
+        // Include 0.10 to generate the interpolated angular velocity for 0.09
+        match interface.get() {
+            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            None => assert!(false),
+        }
+
+        match interface.get() {
+            Some((ts, _ws)) => assert_eq!(ts, [0.08, 0.10, 0.12]),
             None => assert!(false),
         }
     }
