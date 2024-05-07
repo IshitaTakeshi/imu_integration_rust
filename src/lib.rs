@@ -2,9 +2,12 @@
 
 mod generator;
 mod integration;
-pub mod interface;
+mod interface;
 mod interpolation;
 mod residual;
+
+pub use interface::GyroInterface;
+pub use residual::{estimate_bias, GyroscopeResidual};
 
 use nalgebra::{ArrayStorage, Const, Matrix, SMatrix, Vector3};
 

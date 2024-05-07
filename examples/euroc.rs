@@ -1,7 +1,8 @@
-use imu_preintegration::interface::GyroInterface;
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 use serde::Deserialize;
 use std::error::Error;
+
+use imu_preintegration::{estimate_bias, GyroInterface};
 
 #[derive(Debug, Deserialize)]
 struct ImuData {
@@ -89,8 +90,8 @@ fn read_groundtruth(
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let (imu_timestamps, accelerations_, angular_velocities) = read_imu_data()?;
-    let (gt_timestamps, positons_, rotations) = read_groundtruth()?;
+    let (imu_timestamps, _accelerations, angular_velocities) = read_imu_data()?;
+    let (gt_timestamps, _positions, rotations) = read_groundtruth()?;
 
     let mut interface = GyroInterface::new();
 
@@ -104,7 +105,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for _ in 0..10 {
         if let Some(r) = interface.pop() {
-            println!("ts = {:?}", r.timestamps());
+            let bias_pred = estimate_bias(&r);
+            println!("bias_pred = {:?}", bias_pred);
         };
     }
 
