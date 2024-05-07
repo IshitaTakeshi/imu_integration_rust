@@ -48,6 +48,8 @@ impl GyroInterface {
         let n = self.gyroscope_timestamps.len();
         let rt0 = self.rotation_timestamps[0];
         let rt1 = self.rotation_timestamps[1];
+        self.rotations.pop_front();
+        self.rotation_timestamps.pop_front();
 
         println!("rt0                  = {}", rt0);
         println!("rt1                  = {}", rt1);
@@ -70,8 +72,6 @@ impl GyroInterface {
             }
         }
 
-        self.rotations.pop_front();
-        self.rotation_timestamps.pop_front();
         match binary_search(&self.gyroscope_timestamps, rt1) {
             Ok(index) => {
                 let ts = self
@@ -195,7 +195,17 @@ mod tests {
         let (t, omega) = generator.angular_velocity(9);
         interface.add_gyroscope(t, &omega);
 
+        let (tb, qb) = generator.rotation(10);
+        interface.add_reference_pose(tb, &qb);
+
+        let (t, omega) = generator.angular_velocity(11);
+        interface.add_gyroscope(t, &omega);
+
         assert_eq!(interface.get(), None);
+        match interface.get() {
+            Some((ts, _ws)) => assert_eq!(ts, [7., 8., 9., 11.]),
+            None => assert!(false),
+        }
     }
 
     #[test]
