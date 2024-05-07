@@ -112,6 +112,18 @@ impl GyroscopeResidual {
     }
 }
 
+pub fn estimate_bias(gyro: &GyroscopeResidual) -> Vector3<f64> {
+    let mut bias_pred = Vector3::zeros();
+    for _ in 0..5 {
+        let jacobian = gyro.jacobian(&bias_pred);
+        let hessian = jacobian.transpose() * jacobian;
+        let inv_hessian = hessian.try_inverse().unwrap();
+        let dbias = inv_hessian * jacobian.transpose() * gyro.residual(&bias_pred);
+        bias_pred = bias_pred + dbias;
+    }
+    bias_pred
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -246,15 +258,7 @@ mod tests {
 
         let integratable = Integratable::new_interpolated(&ts, &ws, ti, tj);
         let gyro = GyroscopeResidual::new(qi, qj, integratable);
-
-        let mut bias_pred = Vector3::zeros();
-        for _ in 0..5 {
-            let jacobian = gyro.jacobian(&bias_pred);
-            let hessian = jacobian.transpose() * jacobian;
-            let inv_hessian = hessian.try_inverse().unwrap();
-            let dbias = inv_hessian * jacobian.transpose() * gyro.residual(&bias_pred);
-            bias_pred = bias_pred + dbias;
-        }
+        let bias_pred = estimate_bias(&gyro);
         assert!((bias_true + bias_pred).norm() < 1e-13);
     }
 }
