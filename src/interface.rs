@@ -131,9 +131,8 @@ mod tests {
         UnitQuaternion::new_normalize(Quaternion::new(w, x, y, z))
     }
 
-    const DELTA_T: f64 = 0.01;
     fn time(i: usize) -> f64 {
-        DELTA_T * (i as f64)
+        i as f64
     }
 
     #[test]
@@ -164,7 +163,7 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.05, 0.06, 0.07]),
+            Some((ts, _ws)) => assert_eq!(ts, [4., 5., 6., 7.]),
             None => assert!(false),
         }
     }
@@ -254,7 +253,7 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.05, 0.06, 0.07]),
+            Some((ts, _ws)) => assert_eq!(ts, [5., 6., 7.]),
             None => assert!(false),
         }
     }
@@ -290,7 +289,7 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
     }
@@ -325,9 +324,9 @@ mod tests {
         let (t, omega) = generator.angular_velocity(12);
         interface.add_gyroscope(t, &omega);
 
-        // Include 0.04 to generate the interpolated angular velocity for 0.05
+        // Include 4 to generate the interpolated angular velocity for 5
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
     }
@@ -362,9 +361,9 @@ mod tests {
         let (t, omega) = generator.angular_velocity(12);
         interface.add_gyroscope(t, &omega);
 
-        // Include 0.10 to generate the interpolated angular velocity for 0.09
+        // Include 10 to generate the interpolated angular velocity for 9
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
     }
@@ -402,14 +401,14 @@ mod tests {
         let (tb, qb) = generator.rotation(12);
         interface.add_reference_pose(tb, &qb);
 
-        // Include 0.10 to generate the interpolated angular velocity for 0.09
+        // Include 10 to generate the interpolated angular velocity for 9
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.04, 0.06, 0.08, 0.10]),
+            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
             None => assert!(false),
         }
 
         match interface.get() {
-            Some((ts, _ws)) => assert_eq!(ts, [0.08, 0.10, 0.12]),
+            Some((ts, _ws)) => assert_eq!(ts, [8., 10., 12.]),
             None => assert!(false),
         }
     }
