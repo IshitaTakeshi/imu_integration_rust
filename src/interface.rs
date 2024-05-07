@@ -1,7 +1,8 @@
+use crate::residual::{GyroscopeResidual, Integratable};
 use nalgebra::{UnitQuaternion, Vector3};
 use std::collections::VecDeque;
 
-struct GyroInterface {
+pub struct GyroInterface {
     rotation_timestamps: VecDeque<f64>,
     rotations: VecDeque<UnitQuaternion<f64>>,
     gyroscope_timestamps: VecDeque<f64>,
@@ -12,8 +13,20 @@ fn binary_search(target: &VecDeque<f64>, query: f64) -> Result<usize, usize> {
     target.binary_search_by(|t| t.total_cmp(&query))
 }
 
+fn make_gyro_residual(
+    ts: &[f64],
+    ws: &[Vector3<f64>],
+    ti: f64,
+    tj: f64,
+    qi: UnitQuaternion<f64>,
+    qj: UnitQuaternion<f64>,
+) -> GyroscopeResidual {
+    let integratable = Integratable::new_interpolated(ts, ws, ti, tj);
+    GyroscopeResidual::new(qi, qj, integratable)
+}
+
 impl GyroInterface {
-    fn new() -> Self {
+    pub fn new() -> Self {
         GyroInterface {
             rotation_timestamps: VecDeque::<f64>::new(),
             rotations: VecDeque::<UnitQuaternion<f64>>::new(),
@@ -22,7 +35,7 @@ impl GyroInterface {
         }
     }
 
-    fn add_reference_pose(&mut self, t: f64, q: &UnitQuaternion<f64>) {
+    pub fn add_reference_pose(&mut self, t: f64, q: &UnitQuaternion<f64>) {
         if let Some(&back) = self.rotation_timestamps.back() {
             assert!(t > back);
         };
@@ -31,7 +44,7 @@ impl GyroInterface {
         self.rotations.push_back(*q);
     }
 
-    fn add_gyroscope(&mut self, t: f64, w: &Vector3<f64>) {
+    pub fn add_gyroscope(&mut self, t: f64, w: &Vector3<f64>) {
         if let Some(&back) = self.gyroscope_timestamps.back() {
             assert!(t > back);
         };
@@ -40,7 +53,7 @@ impl GyroInterface {
         self.angular_velocities.push_back(*w);
     }
 
-    fn pop(&mut self) -> Option<(Vec<f64>, Vec<Vector3<f64>>)> {
+    pub fn pop(&mut self) -> Option<GyroscopeResidual> {
         if self.gyroscope_timestamps.len() < 2 {
             return None;
         }
@@ -48,8 +61,11 @@ impl GyroInterface {
         let n = self.gyroscope_timestamps.len();
         let rt0 = self.rotation_timestamps[0];
         let rt1 = self.rotation_timestamps[1];
-        self.rotations.pop_front();
+        let rot0 = self.rotations[0];
+        let rot1 = self.rotations[1];
+
         self.rotation_timestamps.pop_front();
+        self.rotations.pop_front();
 
         if rt0 < self.gyroscope_timestamps[0] {
             return None;
@@ -79,7 +95,7 @@ impl GyroInterface {
                     .angular_velocities
                     .drain(..=index)
                     .collect::<Vec<Vector3<f64>>>();
-                return Some((ts, ws));
+                return Some(make_gyro_residual(&ts, &ws, rt0, rt1, rot0, rot1));
             }
             Err(index) => {
                 let mut ts = self
@@ -94,7 +110,7 @@ impl GyroInterface {
                 let w01 = self.angular_velocities.range(0..2);
                 ts.extend(t01);
                 ws.extend(w01);
-                return Some((ts, ws));
+                return Some(make_gyro_residual(&ts, &ws, rt0, rt1, rot0, rot1));
             }
         }
     }
@@ -160,7 +176,7 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [4., 5., 6., 7.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [4., 5., 6., 7.]),
             None => assert!(false),
         }
     }
@@ -199,8 +215,9 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         assert_eq!(interface.pop(), None);
+
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [7., 8., 9., 11.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [7., 8., 9., 10.]),
             None => assert!(false),
         }
     }
@@ -260,7 +277,7 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [5., 6., 7.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [5., 6., 7.]),
             None => assert!(false),
         }
     }
@@ -296,7 +313,7 @@ mod tests {
         interface.add_gyroscope(t, &omega);
 
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [5., 6., 8., 9.]),
             None => assert!(false),
         }
     }
@@ -333,7 +350,7 @@ mod tests {
 
         // Include 4 to generate the interpolated angular velocity for 5
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [5., 6., 8., 10.]),
             None => assert!(false),
         }
     }
@@ -370,7 +387,7 @@ mod tests {
 
         // Include 10 to generate the interpolated angular velocity for 9
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [4., 6., 8., 9.]),
             None => assert!(false),
         }
     }
@@ -410,12 +427,12 @@ mod tests {
 
         // Include 10 to generate the interpolated angular velocity for 9
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [4., 6., 8., 10.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [4., 6., 8., 9.]),
             None => assert!(false),
         }
 
         match interface.pop() {
-            Some((ts, _ws)) => assert_eq!(ts, [8., 10., 12.]),
+            Some(r) => assert_eq!(*(r.timestamps()), [9., 10., 12.]),
             None => assert!(false),
         }
     }

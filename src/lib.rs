@@ -2,7 +2,7 @@
 
 mod generator;
 mod integration;
-mod interface;
+pub mod interface;
 mod interpolation;
 mod residual;
 

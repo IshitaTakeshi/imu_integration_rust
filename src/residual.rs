@@ -5,6 +5,7 @@ use nalgebra::{SMatrix, UnitQuaternion, Vector3};
 
 use crate::inv_right_jacobian;
 
+#[derive(Debug, PartialEq)]
 pub struct Integratable {
     ts: Vec<f64>,
     ws: Vec<Vector3<f64>>,
@@ -66,14 +67,15 @@ impl Integratable {
     }
 }
 
-struct GyroscopeResidual {
+#[derive(Debug, PartialEq)]
+pub struct GyroscopeResidual {
     r_wb_i: UnitQuaternion<f64>,
     r_wb_j: UnitQuaternion<f64>,
     integratable: Integratable,
 }
 
 impl GyroscopeResidual {
-    fn new(
+    pub fn new(
         r_wb_i: UnitQuaternion<f64>,
         r_wb_j: UnitQuaternion<f64>,
         integratable: Integratable,
@@ -85,17 +87,25 @@ impl GyroscopeResidual {
         }
     }
 
-    fn residual(&self, bias: &Vector3<f64>) -> Vector3<f64> {
+    pub fn timestamps(&self) -> &Vec<f64> {
+        &self.integratable.ts
+    }
+
+    pub fn angular_velocities(&self) -> &Vec<Vector3<f64>> {
+        &self.integratable.ws
+    }
+
+    pub fn residual(&self, bias: &Vector3<f64>) -> Vector3<f64> {
         let dr = self.integratable.integrate_euler(bias);
         let d = self.r_wb_j.inverse() * self.r_wb_i * dr;
         d.scaled_axis()
     }
 
-    fn error(&self, bias: &Vector3<f64>) -> f64 {
+    pub fn error(&self, bias: &Vector3<f64>) -> f64 {
         self.residual(bias).norm_squared()
     }
 
-    fn jacobian(&self, bias: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
+    pub fn jacobian(&self, bias: &Vector3<f64>) -> SMatrix<f64, 3, 3> {
         let (m, predecessor) = self.integratable.calc_m_and_predecessor(bias);
         let xi = (self.r_wb_j.inverse() * self.r_wb_i * predecessor).scaled_axis();
         inv_right_jacobian(&xi) * m
